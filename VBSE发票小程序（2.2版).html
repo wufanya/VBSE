@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VBSE 电子发票小程序</title>
+<style>
+:root {
+    --ink: #1f2328;
+    --muted: #64748b;
+    --line: #8e1e18;
+    --paper: #fffdf8;
+    --panel: #ffffff;
+    --primary: #165dff;
+    --green: #13795b;
+    --danger: #b42318;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(180deg, rgba(255,255,255,0.76), rgba(238,242,246,0.94)), #eef2f6;
+    color: var(--ink);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.app {
+    width: min(1680px, calc(100% - 24px));
+    margin: 0 auto;
+    padding: 24px 0 40px;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.86);
+    border: 1px solid #dbe3ee;
+    border-radius: 8px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.title {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.25;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(620px, 720px) minmax(520px, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid #dbe3ee;
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.form-panel { padding: 16px 18px; }
+
+.section {
+    padding: 16px 0;
+    border-top: 1px solid #e6edf5;
+}
+
+.section:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.section h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: #16233a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section h2::before {
+    content: "";
+    width: 4px;
+    height: 16px;
+    border-radius: 99px;
+    background: var(--primary);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field.full { grid-column: 1 / -1; }
+
+label {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid #cfd8e5;
+    border-radius: 6px;
+    background: #fcfdff;
+    color: #111827;
+    padding: 8px 10px;
+    font-size: 15px;
+    outline: none;
+}
+
+textarea {
+    min-height: 76px;
+    resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.12);
+}
+
+.line-editor {
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.line-head,
+.line-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) 48px 56px 72px 118px 78px 78px 38px;
+    gap: 6px;
+    align-items: center;
+}
+
+.line-head > *,
+.line-row > * {
+    min-width: 0;
+}
+
+.line-head {
+    background: #f7f9fc;
+    color: #506176;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.line-row {
+    position: relative;
+    padding: 8px;
+    border-top: 1px solid #e6edf5;
+    background: #fff;
+}
+
+.line-row input,
+.line-row select {
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 13px;
+}
+
+.tax-cell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+}
+
+.tax-cell.manual-mode {
+    grid-template-columns: minmax(56px, 1fr) 54px;
+}
+
+.tax-manual {
+    padding-left: 4px;
+    padding-right: 4px;
+    text-align: center;
+}
+
+.tax-manual[hidden] { display: none; }
+
+.line-money {
+    min-width: 0;
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 8px;
+    border: 1px solid #e4e8ef;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #334155;
+    font: 700 12px "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+}
+
+.line-delete {
+    position: static;
+    min-height: 34px;
+    height: 34px;
+    width: 38px;
+    border: 1px solid #e4e8ef;
+    border-radius: 6px;
+    color: var(--danger);
+    background: #fff5f5;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    box-shadow: none;
+}
+
+.line-delete:hover {
+    background: #ffe4e4;
+    box-shadow: none;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+button {
+    min-height: 42px;
+    border: 0;
+    border-radius: 6px;
+    padding: 0 16px;
+    color: #fff;
+    background: var(--primary);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+button.secondary {
+    color: #17324d;
+    background: #e8eef7;
+}
+
+button.print { background: var(--green); }
+button.ghost { color: var(--primary); background: #eef4ff; }
+button.danger { color: var(--danger); background: #fff1f0; }
+
+.preview-panel {
+    padding: 16px;
+    overflow-x: hidden;
+}
+
+.invoice-stage {
+    --invoice-scale: 1;
+    width: 100%;
+    min-height: calc(760px * var(--invoice-scale));
+}
+
+.invoice {
+    position: relative;
+    width: 1180px;
+    min-height: 760px;
+    margin: 0;
+    padding: 28px 26px 20px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid rgba(142, 30, 24, 0.25);
+    font-family: "SimSun", "FangSong", serif;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+    transform: scale(var(--invoice-scale));
+    transform-origin: top left;
+}
+
+.invoice::before {
+    content: "实训样票";
+    position: absolute;
+    inset: 270px auto auto 390px;
+    z-index: 0;
+    color: rgba(142, 30, 24, 0.055);
+    font: 700 96px "SimHei", sans-serif;
+    letter-spacing: 28px;
+    transform: rotate(-18deg);
+    pointer-events: none;
+}
+
+.invoice > * {
+    position: relative;
+    z-index: 1;
+}
+
+.invoice-header {
+    display: grid;
+    grid-template-columns: 180px 1fr 290px;
+    align-items: start;
+    gap: 24px;
+    min-height: 150px;
+}
+
+.qr {
+    width: 126px;
+    height: 126px;
+    padding: 6px;
+    background: #fff;
+    border: 2px solid #111;
+}
+
+.qr canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+}
+
+.invoice-title {
+    text-align: center;
+    color: var(--line);
+    padding-top: 18px;
+}
+
+.invoice-title h1 {
+    margin: 0 0 12px;
+    font: 400 34px "KaiTi", "STKaiti", "SimSun", serif;
+    letter-spacing: 10px;
+}
+
+.title-rule {
+    width: 420px;
+    margin: 0 auto;
+    border-top: 3px double var(--line);
+}
+
+.seal {
+    position: absolute;
+    top: 38px;
+    left: 50%;
+    width: 176px;
+    height: 100px;
+    transform: translateX(-50%) rotate(-8deg);
+    border: 5px double #d33127;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #d33127;
+    font: 700 16px "KaiTi", serif;
+    opacity: 0.88;
+}
+
+.seal small {
+    display: block;
+    margin-top: 6px;
+    font-size: 13px;
+    letter-spacing: 4px;
+}
+
+.meta {
+    padding-top: 42px;
+    color: var(--line);
+    font: 700 18px "FangSong", serif;
+}
+
+.meta div { margin-bottom: 22px; }
+
+.meta span {
+    color: var(--ink);
+    font: 400 20px "Times New Roman", "SimSun", serif;
+    letter-spacing: 1px;
+}
+
+.invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    border: 2px solid var(--line);
+}
+
+.invoice-table td,
+.invoice-table th {
+    border: 1px solid var(--line);
+    vertical-align: top;
+}
+
+.party-label,
+.remark-label {
+    width: 36px;
+    color: var(--line);
+    text-align: center;
+    font: 700 21px/1.5 "FangSong", serif;
+    letter-spacing: 3px;
+    padding: 18px 6px;
+}
+
+.party-box {
+    height: 126px;
+    padding: 22px 16px;
+    font-size: 20px;
+    line-height: 2.05;
+}
+
+.party-box .caption {
+    color: var(--line);
+    font-weight: 700;
+}
+
+.party-box .tax-id {
+    font-size: 20px;
+    letter-spacing: 4px;
+}
+
+.goods-table { margin-top: -1px; }
+
+.goods-table th {
+    height: 44px;
+    color: var(--line);
+    font: 700 18px "FangSong", serif;
+    text-align: center;
+    vertical-align: middle;
+    background: transparent;
+}
+
+.goods-table td {
+    height: 35px;
+    padding: 4px 8px;
+    font: 400 19px "SimSun", serif;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    border-bottom: 0;
+}
+
+.goods-table .num {
+    text-align: right;
+    font-family: "Times New Roman", "SimSun", serif;
+}
+
+.goods-table .line-total td {
+    height: 48px;
+    border-top: 1px solid var(--line);
+    vertical-align: middle;
+}
+
+.amount-row td {
+    height: 48px;
+    padding: 8px 14px;
+    font-size: 21px;
+    vertical-align: middle;
+}
+
+.amount-label {
+    width: 300px;
+    color: var(--line);
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 8px;
+}
+
+.amount-small {
+    width: 330px;
+    color: var(--line);
+    text-align: center;
+    font-weight: 700;
+}
+
+.remark-row td { height: 116px; }
+
+.remark-content {
+    padding: 8px 12px;
+    white-space: pre-wrap;
+    font-size: 18px;
+    line-height: 1.7;
+}
+
+.footer {
+    display: flex;
+    gap: 72px;
+    margin-top: 22px;
+    padding-left: 90px;
+    font: 400 18px "SimSun", serif;
+}
+
+.history {
+    margin-top: 18px;
+    padding: 16px;
+}
+
+.history-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.history h2 {
+    margin: 0;
+    font-size: 17px;
+}
+
+.history-list {
+    display: grid;
+    gap: 10px;
+}
+
+.history-empty {
+    padding: 16px;
+    border: 1px dashed #cbd5e1;
+    color: var(--muted);
+    text-align: center;
+    border-radius: 6px;
+}
+
+.history-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    border: 1px solid #e0e7ef;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fbfdff;
+}
+
+.history-main strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.history-main span {
+    display: inline-block;
+    margin-right: 12px;
+    color: #526173;
+    font-size: 13px;
+}
+
+.history-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.toast {
+    min-height: 22px;
+    margin-top: 10px;
+    color: var(--green);
+    font-size: 13px;
+}
+
+@media (max-width: 1180px) {
+    .layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1320px) and (min-width: 1181px) {
+    .layout { grid-template-columns: minmax(600px, 680px) minmax(420px, 1fr); }
+}
+
+@media (max-width: 680px) {
+    .app {
+        width: min(100% - 20px, 1480px);
+        padding-top: 14px;
+    }
+
+    .topbar,
+    .history-card { display: block; }
+
+    .grid,
+    .line-row { grid-template-columns: 1fr; }
+
+    .line-head { display: none; }
+
+    .tax-cell { grid-template-columns: 1fr; }
+
+    .line-row > *::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 4px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .history-actions {
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+}
+
+@media print {
+    @page { size: A4 landscape; margin: 6mm; }
+
+    * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    body {
+        background: #fff;
+        margin: 0;
+    }
+
+    .app {
+        width: 1060px;
+        padding: 0;
+        margin: 0;
+    }
+
+    .topbar,
+    .form-panel,
+    .history { display: none !important; }
+
+    .layout,
+    .preview-panel {
+        display: block;
+        padding: 0;
+        border: 0;
+        box-shadow: none;
+        overflow: visible;
+        width: 1060px;
+    }
+
+    .invoice-stage {
+        width: 1060px;
+        min-height: 0 !important;
+    }
+
+    .invoice {
+        width: 1060px;
+        min-height: 0;
+        padding: 12px 14px 8px;
+        margin: 0;
+        box-shadow: none;
+        border: 0;
+        transform: none !important;
+        transform-origin: top left;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .invoice::before {
+        inset: 218px auto auto 340px;
+        font-size: 68px;
+    }
+
+    .invoice-header {
+        grid-template-columns: 132px 1fr 246px;
+        gap: 14px;
+        min-height: 104px;
+    }
+
+    .qr {
+        width: 82px;
+        height: 82px;
+        padding: 4px;
+    }
+
+    .invoice-title { padding-top: 6px; }
+
+    .invoice-title h1 {
+        font-size: 27px;
+        letter-spacing: 8px;
+        margin-bottom: 8px;
+    }
+
+    .title-rule { width: 360px; }
+
+    .seal {
+        top: 25px;
+        width: 132px;
+        height: 72px;
+        font-size: 12px;
+    }
+
+    .meta {
+        padding-top: 22px;
+        font-size: 15px;
+    }
+
+    .meta div { margin-bottom: 13px; }
+    .meta span { font-size: 16px; }
+
+    .party-label,
+    .remark-label {
+        width: 30px;
+        font-size: 16px;
+        padding: 8px 4px;
+    }
+
+    .party-box {
+        height: 92px;
+        padding: 11px 12px;
+        font-size: 16px;
+        line-height: 1.75;
+    }
+
+    .party-box .tax-id {
+        font-size: 16px;
+        letter-spacing: 3px;
+    }
+
+    .goods-table th {
+        height: 28px;
+        font-size: 14px;
+        padding: 2px 4px;
+    }
+
+    .goods-table td {
+        height: 24px;
+        padding: 2px 5px;
+        font-size: 14px;
+    }
+
+    .goods-table .line-total td { height: 30px; }
+
+    .goods-table th:nth-child(1) { width: 230px !important; }
+    .goods-table th:nth-child(2) { width: 76px !important; }
+    .goods-table th:nth-child(3) { width: 90px !important; }
+    .goods-table th:nth-child(4) { width: 132px !important; }
+    .goods-table th:nth-child(5) { width: 130px !important; }
+    .goods-table th:nth-child(6) { width: 108px !important; }
+    .goods-table th:nth-child(7) { width: 116px !important; }
+
+    .amount-row td {
+        height: 32px;
+        padding: 4px 10px;
+        font-size: 16px;
+    }
+
+    .amount-label { width: 250px; }
+    .amount-small { width: 280px; }
+    .remark-row td { height: 64px; }
+
+    .remark-content {
+        font-size: 14px;
+        line-height: 1.42;
+    }
+
+    .footer {
+        margin-top: 8px;
+        padding-left: 56px;
+        gap: 54px;
+        font-size: 14px;
+        line-height: 1.2;
+        white-space: nowrap;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
+</style>
+</head>
+<body>
+<main class="app">
+    <header class="topbar">
+        <div>
+            <h1 class="title">VBSE 实训 · 电子发票小程序</h1>
+        </div>
+        <div class="actions">
+            <button class="print" type="button" onclick="printInvoice()">打印/导出 PDF</button>
+        </div>
+    </header>
+
+    <div class="layout">
+        <section class="panel form-panel">
+            <div class="section">
+                <h2>基本信息</h2>
+                <div class="grid">
+                    <div class="field">
+                        <label for="invoiceNumber">发票号码</label>
+                        <input id="invoiceNumber" class="invoice-number" inputmode="numeric">
+                    </div>
+                    <div class="field">
+                        <label for="invoiceDate">开票日期</label>
+                        <input id="invoiceDate" type="date">
+                    </div>
+                    <div class="field">
+                        <label for="drawer">开票人</label>
+                        <input id="drawer" value="李明">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>购买方信息</h2>
+                <div class="grid">
+                    <div class="field full">
+                        <label for="buyerCompany">选择企业</label>
+                        <select id="buyerCompany" class="company-select" onchange="applyCompany('buyer')"></select>
+                    </div>
+                    <div class="field full">
+                        <label for="buyerName">名称</label>
+                        <input id="buyerName">
+                    </div>
+                    <div class="field full">
+                        <label for="buyerTax">统一社会信用代码/纳税人识别号</label>
+                        <input id="buyerTax">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>销售方信息</h2>
+                <div class="grid">
+                    <div class="field full">
+                        <label for="sellerCompany">选择企业</label>
+                        <select id="sellerCompany" class="company-select" onchange="applyCompany('seller')"></select>
+                    </div>
+                    <div class="field full">
+                        <label for="sellerName">名称</label>
+                        <input id="sellerName">
+                    </div>
+                    <div class="field full">
+                        <label for="sellerTax">统一社会信用代码/纳税人识别号</label>
+                        <input id="sellerTax">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>项目明细</h2>
+                <div class="line-editor">
+                    <div class="line-head">
+                        <span>项目/货物名称</span>
+                        <span>单位</span>
+                        <span>数量</span>
+                        <span>不含税单价</span>
+                        <span>税率</span>
+                        <span>金额</span>
+                        <span>税额</span>
+                        <span></span>
+                    </div>
+                    <div id="lineItems"></div>
+                </div>
+                <div class="actions">
+                    <button class="secondary" type="button" onclick="addLineItem()">增加一行</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>备注</h2>
+                <div class="field">
+                    <label for="remarkInput">备注内容</label>
+                    <textarea id="remarkInput">购方开户银行：--;    银行账号：--;
+销方开户银行：--;    银行账号：--</textarea>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="button" onclick="createInvoice()">生成电子发票</button>
+                <button class="ghost" type="button" onclick="fillSample()">填入示例</button>
+            </div>
+            <div id="toast" class="toast" aria-live="polite"></div>
+        </section>
+
+        <section class="panel preview-panel" id="previewPanel">
+            <div class="invoice-stage" id="invoiceStage">
+            <article class="invoice" id="invoice">
+                <div class="invoice-header">
+                    <div class="qr" aria-label="发票二维码">
+                        <canvas id="pQrCanvas" class="qr-canvas" width="132" height="132"></canvas>
+                    </div>
+                    <div class="invoice-title">
+                        <h1>电子发票（普通发票）</h1>
+                        <div class="title-rule"></div>
+                        <div class="seal">全国统一发票监制章<small>税务总局</small></div>
+                    </div>
+                    <div class="meta">
+                        <div>发票号码：<span id="pInvoiceNumber"></span></div>
+                        <div>开票日期：<span id="pInvoiceDate"></span></div>
+                    </div>
+                </div>
+
+                <table class="invoice-table">
+                    <tr>
+                        <td class="party-label">购买方信息</td>
+                        <td class="party-box">
+                            <div><span class="caption">名称：</span><span id="pBuyerName"></span></div>
+                            <div><span class="caption">统一社会信用代码/纳税人识别号：</span><span class="tax-id" id="pBuyerTax"></span></div>
+                        </td>
+                        <td class="party-label">销售方信息</td>
+                        <td class="party-box">
+                            <div><span class="caption">名称：</span><span id="pSellerName"></span></div>
+                            <div><span class="caption">统一社会信用代码/纳税人识别号：</span><span class="tax-id" id="pSellerTax"></span></div>
+                        </td>
+                    </tr>
+                </table>
+
+                <table class="invoice-table goods-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 270px;">项目名称</th>
+                            <th style="width: 90px;">单位</th>
+                            <th style="width: 115px;">数量</th>
+                            <th style="width: 160px;">不含税单价</th>
+                            <th style="width: 150px;">金额</th>
+                            <th style="width: 120px;">税率/征收率</th>
+                            <th>税额</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pGoodsBody"></tbody>
+                    <tfoot>
+                        <tr class="line-total">
+                            <td colspan="4" style="color: var(--line); text-align:center; letter-spacing:36px;">合计</td>
+                            <td class="num" id="pTotalAmount"></td>
+                            <td></td>
+                            <td class="num" id="pTotalTax"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <table class="invoice-table">
+                    <tr class="amount-row">
+                        <td class="amount-label">价税合计（大写）</td>
+                        <td id="pUpperAmount"></td>
+                        <td class="amount-small">（小写）<span id="pGrandTotal"></span></td>
+                    </tr>
+                    <tr class="remark-row">
+                        <td class="remark-label">备注</td>
+                        <td colspan="2" class="remark-content" id="pRemark"></td>
+                    </tr>
+                </table>
+
+                <div class="footer">
+                    <span>开票人：<span id="pDrawer"></span></span>
+                    <span>复核：</span>
+                    <span>实训票据，仅供教学使用</span>
+                </div>
+            </article>
+            </div>
+        </section>
+    </div>
+
+    <section class="panel history" id="historyPanel">
+        <div class="history-head">
+            <h2>历史记录</h2>
+            <button class="danger" type="button" onclick="clearHistory()">清空历史</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+    </section>
+</main>
+
+<script>
+const STORAGE_NEXT_NUMBER = "vbseInvoiceNextNumber";
+const STORAGE_HISTORY = "vbseInvoiceHistory";
+const DEFAULT_INVOICE_NUMBER = "26412000001304072701";
+const MANUAL_COMPANY = "__manual__";
+const MANUAL_TAX_RATE = "manual";
+let currentInvoiceData = null;
+
+const COMPANY_OPTIONS = [
+    {"name":"宝乐童车制造有限公司","taxId":"110108809018632001"},
+    {"name":"小精灵童车制造有限公司","taxId":"110108809018633002"},
+    {"name":"童飞童车制造有限公司","taxId":"110108809018634003"},
+    {"name":"爱贝尔童车制造有限公司","taxId":"110108809018635004"},
+    {"name":"豆豆熊童车制造有限公司","taxId":"110108809018636005"},
+    {"name":"五彩梦童车制造有限公司","taxId":"110108809018637006"},
+    {"name":"旭日商贸有限公司","taxId":"110108554831327011"},
+    {"name":"华晨商贸有限公司","taxId":"110108753990101012"},
+    {"name":"仁和商贸有限公司","taxId":"110108554831245013"},
+    {"name":"天府商贸有限公司","taxId":"110108120101673014"},
+    {"name":"恒通工贸有限公司","taxId":"110000001012587015"},
+    {"name":"邦尼工贸有限公司","taxId":"110106311235740016"},
+    {"name":"思远工贸有限公司","taxId":"110020001012524017"},
+    {"name":"新耀工贸有限公司","taxId":"110113050173019018"},
+    {"name":"隆飞物流有限公司","taxId":"100108231234856019"},
+    {"name":"百联集团有限公司","taxId":"100108666987335020"},
+    {"name":"五洲进出口有限公司","taxId":"110108120101688021"},
+    {"name":"立新会计师事务所","taxId":"100108964537943022"},
+    {"name":"新华招投标有限公司","taxId":"110108120101123023"},
+    {"name":"融通综合服务有限公司","taxId":"100108231234858024"},
+    {"name":"中国工商银行北京分行营业部","taxId":"100108532345678025"},
+    {"name":"中国银行北京分行营业部","taxId":"100123458675432012"},
+    {"name":"进出口服务中心","taxId":"100123458675433013"}
+];
+
+const sampleLines = [
+    { name: "*办公用品*资料夹", unit: "个", qty: 36, price: 8.5, taxRate: 0.13 },
+    { name: "*印刷服务*宣传单", unit: "批", qty: 2, price: 680, taxRate: 0.06 },
+    { name: "*技术服务*版面设计", unit: "项", qty: 1, price: 1200, taxRate: 0.06 }
+];
+
+function byId(id) {
+    return document.getElementById(id);
+}
+
+function showToast(message) {
+    byId("toast").textContent = message;
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(() => byId("toast").textContent = "", 2600);
+}
+
+function populateCompanySelects() {
+    ["buyer", "seller"].forEach(role => {
+        const select = byId(`${role}Company`);
+        select.innerHTML = "";
+        COMPANY_OPTIONS.forEach((company, index) => {
+            const option = document.createElement("option");
+            option.value = String(index);
+            option.textContent = company.name;
+            select.appendChild(option);
+        });
+        const manual = document.createElement("option");
+        manual.value = MANUAL_COMPANY;
+        manual.textContent = "手动输入企业";
+        select.appendChild(manual);
+    });
+}
+
+function applyCompany(role) {
+    const select = byId(`${role}Company`);
+    if (select.value === MANUAL_COMPANY) {
+        byId(`${role}Name`).readOnly = false;
+        byId(`${role}Tax`).readOnly = false;
+        byId(`${role}Name`).focus();
+        return;
+    }
+    const company = COMPANY_OPTIONS[Number(select.value)];
+    if (!company) return;
+    byId(`${role}Name`).value = company.name;
+    byId(`${role}Tax`).value = company.taxId;
+    byId(`${role}Name`).readOnly = false;
+    byId(`${role}Tax`).readOnly = false;
+}
+
+function syncCompanySelect(role, name, taxId) {
+    const index = COMPANY_OPTIONS.findIndex(company => company.name === name && company.taxId === taxId);
+    byId(`${role}Company`).value = index >= 0 ? String(index) : MANUAL_COMPANY;
+}
+
+function getNextInvoiceNumber() {
+    return localStorage.getItem(STORAGE_NEXT_NUMBER) || DEFAULT_INVOICE_NUMBER;
+}
+
+function setNextInvoiceNumber(value) {
+    localStorage.setItem(STORAGE_NEXT_NUMBER, value.toString());
+}
+
+function incrementInvoiceNumber(value) {
+    const source = /^\d+$/.test(String(value)) ? String(value) : getNextInvoiceNumber();
+    const next = incrementDecimalString(source);
+    setNextInvoiceNumber(next);
+    byId("invoiceNumber").value = next;
+}
+
+function incrementDecimalString(value) {
+    const digits = String(value).split("");
+    let carry = 1;
+    for (let i = digits.length - 1; i >= 0; i--) {
+        const sum = Number(digits[i]) + carry;
+        digits[i] = String(sum % 10);
+        carry = sum > 9 ? 1 : 0;
+        if (!carry) break;
+    }
+    if (carry) digits.unshift("1");
+    return digits.join("");
+}
+
+function formatDateCn(dateValue) {
+    if (!dateValue) return "";
+    const parts = dateValue.split("-");
+    return `${parts[0]}年${parts[1]}月${parts[2]}日`;
+}
+
+function formatMoney(value, withSymbol) {
+    const number = Number(value || 0);
+    const text = number.toLocaleString("zh-CN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+    return withSymbol ? `￥${text}` : text;
+}
+
+function formatUnitPrice(value) {
+    const number = Number(value || 0);
+    return Number.isInteger(number) ? number.toFixed(2) : String(number).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function toChineseUpperMoney(value) {
+    const digits = ["零", "壹", "贰", "叁", "肆", "伍", "陆", "柒", "捌", "玖"];
+    const units = ["", "拾", "佰", "仟"];
+    const sections = ["", "万", "亿", "兆"];
+    const number = Math.round(Math.abs(Number(value || 0)) * 100);
+    const integer = Math.floor(number / 100);
+    const fraction = number % 100;
+
+    function sectionToChinese(section) {
+        let result = "";
+        let zero = false;
+        for (let i = 0; i < 4; i++) {
+            const digit = section % 10;
+            if (digit === 0) {
+                if (result) zero = true;
+            } else {
+                result = digits[digit] + units[i] + (zero ? "零" : "") + result;
+                zero = false;
+            }
+            section = Math.floor(section / 10);
+        }
+        return result;
+    }
+
+    let intText = "";
+    let intPart = integer;
+    let sectionIndex = 0;
+    let needZero = false;
+    if (intPart === 0) intText = "零";
+    while (intPart > 0) {
+        const section = intPart % 10000;
+        if (section === 0) {
+            needZero = intText.length > 0;
+        } else {
+            const prefix = needZero ? "零" : "";
+            intText = prefix + sectionToChinese(section) + sections[sectionIndex] + intText;
+            needZero = section < 1000;
+        }
+        intPart = Math.floor(intPart / 10000);
+        sectionIndex++;
+    }
+
+    const jiao = Math.floor(fraction / 10);
+    const fen = fraction % 10;
+    let fractionText = "";
+    if (jiao === 0 && fen === 0) {
+        fractionText = "整";
+    } else {
+        if (jiao > 0) fractionText += digits[jiao] + "角";
+        if (fen > 0) fractionText += digits[fen] + "分";
+    }
+    return `ⓧ${intText}圆${fractionText}`;
+}
+
+function addLineItem(line = {}) {
+    const row = document.createElement("div");
+    row.className = "line-row";
+    row.innerHTML = `
+        <input data-label="项目/货物名称" class="line-name" value="${escapeAttr(line.name || "")}" placeholder="项目/货物名称">
+        <input data-label="单位" class="line-unit" value="${escapeAttr(line.unit || "份")}" placeholder="单位">
+        <input data-label="数量" class="line-qty" type="number" step="0.01" value="${line.qty !== undefined ? line.qty : 1}">
+        <input data-label="不含税单价" class="line-price" type="number" step="0.000000000001" value="${line.price !== undefined ? line.price : 0}">
+        <div data-label="税率" class="tax-cell">
+            <select class="tax-rate-select">
+                <option value="0">0%</option>
+                <option value="0.06">6%</option>
+                <option value="0.09">9%</option>
+                <option value="0.13">13%</option>
+                <option value="${MANUAL_TAX_RATE}">手动</option>
+            </select>
+            <input class="tax-manual" type="number" min="0" max="100" step="0.01" placeholder="%" hidden>
+        </div>
+        <span data-label="金额" class="line-money line-amount">0.00</span>
+        <span data-label="税额" class="line-money line-tax-amount">0.00</span>
+        <button class="line-delete" type="button" title="删除本行" aria-label="删除本行" onclick="removeLineItem(this)">删</button>
+    `;
+    byId("lineItems").appendChild(row);
+    setTaxControlValue(row, line.taxRate !== undefined ? line.taxRate : 0.13);
+    row.querySelectorAll("input, select").forEach(control => {
+        control.addEventListener("input", () => updateLineTotals(row));
+        control.addEventListener("change", () => updateLineTotals(row));
+    });
+    row.querySelector(".tax-rate-select").addEventListener("change", () => toggleManualTax(row));
+    toggleManualTax(row);
+    updateLineTotals(row);
+}
+
+function removeLineItem(button) {
+    const rows = document.querySelectorAll(".line-row");
+    if (rows.length <= 1) {
+        showToast("至少保留一行明细");
+        return;
+    }
+    const row = findLineRow(button);
+    if (!row) {
+        showToast("没有找到要删除的明细行");
+        return;
+    }
+    row.parentNode.removeChild(row);
+    refreshPreviewFromForm();
+}
+
+function findLineRow(node) {
+    while (node && node !== document) {
+        if (node.className && String(node.className).split(/\s+/).indexOf("line-row") !== -1) {
+            return node;
+        }
+        node = node.parentNode;
+    }
+    return null;
+}
+
+function refreshPreviewFromForm() {
+    const data = collectInvoiceData();
+    data.qrPayload = currentInvoiceData && currentInvoiceData.qrPayload;
+    renderInvoice(data);
+}
+
+function setTaxControlValue(row, taxRate) {
+    const select = row.querySelector(".tax-rate-select");
+    const manual = row.querySelector(".tax-manual");
+    const normalized = Number(taxRate || 0);
+    const common = ["0", "0.06", "0.09", "0.13"];
+    const match = common.find(value => Math.abs(Number(value) - normalized) < 0.000001);
+    if (match !== undefined) {
+        select.value = match;
+        manual.hidden = true;
+        manual.value = "";
+    } else {
+        select.value = MANUAL_TAX_RATE;
+        manual.hidden = false;
+        manual.value = formatTaxPercent(normalized);
+    }
+}
+
+function toggleManualTax(row) {
+    const select = row.querySelector(".tax-rate-select");
+    const manual = row.querySelector(".tax-manual");
+    const isManual = select.value === MANUAL_TAX_RATE;
+    manual.hidden = !isManual;
+    row.querySelector(".tax-cell").classList.toggle("manual-mode", isManual);
+}
+
+function escapeAttr(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+function readLineItems() {
+    return Array.from(document.querySelectorAll(".line-row")).map(row => {
+        const qty = Number(row.querySelector(".line-qty").value || 0);
+        const price = Number(row.querySelector(".line-price").value || 0);
+        const taxRate = readTaxRate(row);
+        const amount = qty * price;
+        const taxAmount = amount * taxRate;
+        return {
+            name: row.querySelector(".line-name").value.trim(),
+            unit: row.querySelector(".line-unit").value.trim(),
+            qty,
+            price,
+            taxRate,
+            amount,
+            taxAmount
+        };
+    }).filter(line => line.name || line.qty || line.price);
+}
+
+function updateLineTotals(row) {
+    toggleManualTax(row);
+    const qty = Number(row.querySelector(".line-qty").value || 0);
+    const price = Number(row.querySelector(".line-price").value || 0);
+    const taxRate = readTaxRate(row);
+    const amount = qty * price;
+    const taxAmount = amount * taxRate;
+    row.querySelector(".line-amount").textContent = formatMoney(amount);
+    row.querySelector(".line-tax-amount").textContent = formatMoney(taxAmount);
+}
+
+function readTaxRate(row) {
+    const select = row.querySelector(".tax-rate-select");
+    if (select.value === MANUAL_TAX_RATE) {
+        return Number(row.querySelector(".tax-manual").value || 0) / 100;
+    }
+    return Number(select.value || 0);
+}
+
+function formatTaxPercent(rate) {
+    const percent = Number(rate || 0) * 100;
+    return Number.isInteger(percent) ? String(percent) : String(Number(percent.toFixed(2)));
+}
+
+function collectInvoiceData() {
+    const lines = readLineItems();
+    const totalAmount = lines.reduce((sum, line) => sum + line.amount, 0);
+    const totalTax = lines.reduce((sum, line) => sum + line.taxAmount, 0);
+    const grandTotal = totalAmount + totalTax;
+    return {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        savedAt: new Date().toISOString(),
+        invoiceNumber: byId("invoiceNumber").value.trim() || getNextInvoiceNumber(),
+        invoiceDate: byId("invoiceDate").value,
+        buyerName: byId("buyerName").value.trim(),
+        buyerTax: byId("buyerTax").value.trim(),
+        sellerName: byId("sellerName").value.trim(),
+        sellerTax: byId("sellerTax").value.trim(),
+        drawer: byId("drawer").value.trim(),
+        remark: byId("remarkInput").value.trim(),
+        lines,
+        totalAmount,
+        totalTax,
+        grandTotal,
+        qrPayload: currentInvoiceData && currentInvoiceData.qrPayload
+    };
+}
+
+function validateInvoice(data) {
+    if (!data.invoiceDate) return "请选择开票日期";
+    if (!data.buyerName || !data.buyerTax) return "请选择或填写购买方名称和税号";
+    if (!data.sellerName || !data.sellerTax) return "请选择或填写销售方名称和税号";
+    if (data.lines.length === 0) return "请至少填写一行项目明细";
+    if (data.lines.some(line => !line.name)) return "项目明细的名称不能为空";
+    if (data.lines.some(line => line.qty <= 0 || line.price < 0)) return "数量必须大于 0，不含税单价不能为负数";
+    if (data.lines.some(line => line.taxRate < 0 || line.taxRate > 1)) return "税率请输入 0 到 100 之间的百分比";
+    return "";
+}
+
+function ensureQrPayload(data, forceNew) {
+    if (!forceNew && data.qrPayload) return data.qrPayload;
+    const random = Math.random().toString(36).slice(2, 10).toUpperCase();
+    return `VBSE|NO:${data.invoiceNumber}|DATE:${data.invoiceDate}|CHK:${random}|TRAINING`;
+}
+
+function renderInvoice(data) {
+    data.qrPayload = ensureQrPayload(data, false);
+    currentInvoiceData = data;
+    byId("pInvoiceNumber").textContent = data.invoiceNumber;
+    byId("pInvoiceDate").textContent = formatDateCn(data.invoiceDate);
+    byId("pBuyerName").textContent = data.buyerName;
+    byId("pBuyerTax").textContent = data.buyerTax;
+    byId("pSellerName").textContent = data.sellerName;
+    byId("pSellerTax").textContent = data.sellerTax;
+    byId("pTotalAmount").textContent = formatMoney(data.totalAmount, true);
+    byId("pTotalTax").textContent = formatMoney(data.totalTax, true);
+    byId("pUpperAmount").textContent = toChineseUpperMoney(data.grandTotal);
+    byId("pGrandTotal").textContent = formatMoney(data.grandTotal, true);
+    byId("pRemark").textContent = data.remark || " ";
+    byId("pDrawer").textContent = data.drawer;
+    drawQrCode("pQrCanvas", data.qrPayload);
+
+    const body = byId("pGoodsBody");
+    body.innerHTML = "";
+    const displayLines = data.lines;
+    displayLines.forEach(line => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${escapeHtml(line.name)}</td>
+            <td style="text-align:center;">${escapeHtml(line.unit)}</td>
+            <td class="num">${line.qty}</td>
+            <td class="num">${formatUnitPrice(line.price)}</td>
+            <td class="num">${formatMoney(line.amount)}</td>
+            <td style="text-align:center;">${formatTaxPercent(line.taxRate)}%</td>
+            <td class="num">${formatMoney(line.taxAmount)}</td>
+        `;
+        body.appendChild(tr);
+    });
+    for (let i = displayLines.length; i < Math.max(8, displayLines.length); i++) {
+        const empty = document.createElement("tr");
+        empty.innerHTML = "<td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td>";
+        body.appendChild(empty);
+    }
+    updateInvoiceScale();
+}
+
+function escapeHtml(value) {
+    return String(value === undefined || value === null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function createInvoice() {
+    const data = collectInvoiceData();
+    const error = validateInvoice(data);
+    if (error) {
+        showToast(error);
+        return;
+    }
+    data.qrPayload = ensureQrPayload(data, true);
+    renderInvoice(data);
+    saveHistory(data);
+    incrementInvoiceNumber(data.invoiceNumber);
+    renderHistory();
+    showToast(`已生成并保存发票 ${data.invoiceNumber}`);
+}
+
+function saveHistory(data) {
+    const history = getHistory();
+    history.unshift(data);
+    localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history.slice(0, 100)));
+}
+
+function getHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_HISTORY) || "[]");
+    } catch (error) {
+        return [];
+    }
+}
+
+function normalizeHistoryItem(item) {
+    item.lines = (item.lines || []).map(line => ({
+        name: line.name || "",
+        unit: line.unit || "份",
+        qty: Number(line.qty || 0),
+        price: Number(line.price || 0),
+        taxRate: Number(line.taxRate || 0),
+        amount: Number(line.amount || 0),
+        taxAmount: Number(line.taxAmount || 0)
+    }));
+    item.totalAmount = item.lines.reduce((sum, line) => sum + line.amount, 0);
+    item.totalTax = item.lines.reduce((sum, line) => sum + line.taxAmount, 0);
+    item.grandTotal = item.totalAmount + item.totalTax;
+    item.qrPayload = ensureQrPayload(item, false);
+    return item;
+}
+
+function renderHistory() {
+    const list = byId("historyList");
+    const history = getHistory();
+    list.innerHTML = "";
+    if (history.length === 0) {
+        list.innerHTML = '<div class="history-empty">还没有历史记录，生成发票后会自动保存到这里。</div>';
+        return;
+    }
+    history.forEach(item => {
+        item = normalizeHistoryItem(item);
+        const card = document.createElement("div");
+        card.className = "history-card";
+        card.innerHTML = `
+            <div class="history-main">
+                <strong>发票号码：${escapeHtml(item.invoiceNumber)}</strong>
+                <span>日期：${escapeHtml(formatDateCn(item.invoiceDate))}</span>
+                <span>购方：${escapeHtml(item.buyerName)}</span>
+                <span>销方：${escapeHtml(item.sellerName)}</span>
+                <span>价税合计：${escapeHtml(formatMoney(item.grandTotal, true))}</span>
+            </div>
+            <div class="history-actions">
+                <button class="ghost" type="button" onclick="loadHistory('${item.id}')">查看/载入</button>
+                <button class="print" type="button" onclick="printHistory('${item.id}')">打印</button>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function loadHistory(id) {
+    const item = getHistory().find(entry => entry.id === id);
+    if (!item) return;
+    const normalized = normalizeHistoryItem(item);
+    fillForm(normalized);
+    renderInvoice(normalized);
+    showToast(`已载入历史发票 ${normalized.invoiceNumber}`);
+}
+
+function printHistory(id) {
+    const item = getHistory().find(entry => entry.id === id);
+    if (!item) return;
+    renderInvoice(normalizeHistoryItem(item));
+    printInvoice();
+}
+
+function clearHistory() {
+    if (!confirm("确定清空本浏览器里的全部历史记录吗？")) return;
+    localStorage.removeItem(STORAGE_HISTORY);
+    renderHistory();
+    showToast("历史记录已清空");
+}
+
+function fillForm(data) {
+    byId("invoiceNumber").value = data.invoiceNumber || getNextInvoiceNumber();
+    byId("invoiceDate").value = data.invoiceDate || today();
+    byId("buyerName").value = data.buyerName || "";
+    byId("buyerTax").value = data.buyerTax || "";
+    byId("sellerName").value = data.sellerName || "";
+    byId("sellerTax").value = data.sellerTax || "";
+    byId("drawer").value = data.drawer || "";
+    byId("remarkInput").value = data.remark || "";
+    syncCompanySelect("buyer", data.buyerName || "", data.buyerTax || "");
+    syncCompanySelect("seller", data.sellerName || "", data.sellerTax || "");
+    byId("lineItems").innerHTML = "";
+    (data.lines && data.lines.length ? data.lines : sampleLines).forEach(addLineItem);
+}
+
+function fillSample() {
+    fillForm({
+        invoiceNumber: getNextInvoiceNumber(),
+        invoiceDate: today(),
+        buyerName: COMPANY_OPTIONS[7].name,
+        buyerTax: COMPANY_OPTIONS[7].taxId,
+        sellerName: COMPANY_OPTIONS[0].name,
+        sellerTax: COMPANY_OPTIONS[0].taxId,
+        drawer: "李明",
+        remark: "购方开户银行：--;    银行账号：--;\n销方开户银行：--;    银行账号：--",
+        lines: sampleLines
+    });
+    renderInvoice(collectInvoiceData());
+}
+
+function printInvoice() {
+    if (!currentInvoiceData) {
+        const data = collectInvoiceData();
+        const error = validateInvoice(data);
+        if (error) {
+            showToast(error);
+            return;
+        }
+        renderInvoice(data);
+    }
+    window.print();
+}
+
+function today() {
+    const date = new Date();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function boot() {
+    populateCompanySelects();
+    byId("invoiceDate").value = today();
+    byId("invoiceNumber").value = getNextInvoiceNumber();
+    fillSample();
+    renderHistory();
+    updateInvoiceScale();
+}
+
+function updateInvoiceScale() {
+    const panel = byId("previewPanel");
+    const stage = byId("invoiceStage");
+    const invoice = byId("invoice");
+    if (!panel || !stage || !invoice) return;
+    const availableWidth = panel.clientWidth;
+    const invoiceWidth = 1180;
+    const scale = Math.min(1, Math.max(0.45, availableWidth / invoiceWidth));
+    stage.style.setProperty("--invoice-scale", scale.toFixed(4));
+    stage.style.minHeight = `${invoice.offsetHeight * scale}px`;
+}
+
+function drawQrCode(canvasId, text) {
+    const canvas = byId(canvasId);
+    const matrix = makeQrMatrix(text || "VBSE");
+    const quiet = 4;
+    const modules = matrix.length + quiet * 2;
+    const scale = Math.floor(canvas.width / modules);
+    const size = modules * scale;
+    const offset = Math.floor((canvas.width - size) / 2);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000";
+    for (let y = 0; y < matrix.length; y++) {
+        for (let x = 0; x < matrix.length; x++) {
+            if (matrix[y][x]) {
+                ctx.fillRect(offset + (x + quiet) * scale, offset + (y + quiet) * scale, scale, scale);
+            }
+        }
+    }
+}
+
+function makeQrMatrix(text) {
+    const version = 4;
+    const size = 33;
+    const dataCodewords = 80;
+    const eccCodewords = 20;
+    const bytes = asciiBytes(text).slice(0, 62);
+    const bits = [];
+    appendBits(bits, 0x4, 4);
+    appendBits(bits, bytes.length, 8);
+    bytes.forEach(byte => appendBits(bits, byte, 8));
+    const capacityBits = dataCodewords * 8;
+    appendBits(bits, 0, Math.min(4, capacityBits - bits.length));
+    while (bits.length % 8) bits.push(0);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) {
+        data.push(bitsToByte(bits.slice(i, i + 8)));
+    }
+    for (let pad = 0xec; data.length < dataCodewords; pad = pad === 0xec ? 0x11 : 0xec) {
+        data.push(pad);
+    }
+    const ecc = reedSolomonRemainder(data, eccCodewords);
+    const codewords = data.concat(ecc);
+    const matrix = Array.from({ length: size }, () => Array(size).fill(false));
+    const reserved = Array.from({ length: size }, () => Array(size).fill(false));
+    drawFinder(matrix, reserved, 0, 0);
+    drawFinder(matrix, reserved, size - 7, 0);
+    drawFinder(matrix, reserved, 0, size - 7);
+    drawTiming(matrix, reserved, size);
+    drawAlignment(matrix, reserved, 26, 26);
+    reserveFormat(reserved, size);
+    matrix[4 * version + 9][8] = true;
+    reserved[4 * version + 9][8] = true;
+    placeData(matrix, reserved, codewords, size);
+    drawFormatBits(matrix, reserved, size, 1, 0);
+    return matrix;
+}
+
+function asciiBytes(text) {
+    const safe = String(text).replace(/[^\x20-\x7e]/g, "?");
+    return Array.from(safe).map(ch => ch.charCodeAt(0));
+}
+
+function appendBits(bits, value, length) {
+    for (let i = length - 1; i >= 0; i--) bits.push((value >>> i) & 1);
+}
+
+function bitsToByte(bits) {
+    return bits.reduce((value, bit) => (value << 1) | bit, 0);
+}
+
+function drawFinder(matrix, reserved, x, y) {
+    for (let dy = -1; dy <= 7; dy++) {
+        for (let dx = -1; dx <= 7; dx++) {
+            const xx = x + dx;
+            const yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= matrix.length || yy >= matrix.length) continue;
+            const on = dx >= 0 && dx <= 6 && dy >= 0 && dy <= 6 &&
+                (dx === 0 || dx === 6 || dy === 0 || dy === 6 || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4));
+            matrix[yy][xx] = on;
+            reserved[yy][xx] = true;
+        }
+    }
+}
+
+function drawTiming(matrix, reserved, size) {
+    for (let i = 8; i < size - 8; i++) {
+        const on = i % 2 === 0;
+        matrix[6][i] = on;
+        matrix[i][6] = on;
+        reserved[6][i] = true;
+        reserved[i][6] = true;
+    }
+}
+
+function drawAlignment(matrix, reserved, cx, cy) {
+    for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+            const dist = Math.max(Math.abs(dx), Math.abs(dy));
+            matrix[cy + dy][cx + dx] = dist !== 1;
+            reserved[cy + dy][cx + dx] = true;
+        }
+    }
+}
+
+function reserveFormat(reserved, size) {
+    for (let i = 0; i < 9; i++) {
+        reserved[8][i] = true;
+        reserved[i][8] = true;
+    }
+    for (let i = 0; i < 8; i++) {
+        reserved[8][size - 1 - i] = true;
+        reserved[size - 1 - i][8] = true;
+    }
+}
+
+function placeData(matrix, reserved, codewords, size) {
+    const bits = [];
+    codewords.forEach(byte => appendBits(bits, byte, 8));
+    let bitIndex = 0;
+    let upward = true;
+    for (let x = size - 1; x > 0; x -= 2) {
+        if (x === 6) x--;
+        for (let yStep = 0; yStep < size; yStep++) {
+            const y = upward ? size - 1 - yStep : yStep;
+            for (let dx = 0; dx < 2; dx++) {
+                const xx = x - dx;
+                if (reserved[y][xx]) continue;
+                let bit = bitIndex < bits.length ? bits[bitIndex++] : 0;
+                if ((xx + y) % 2 === 0) bit ^= 1;
+                matrix[y][xx] = bit === 1;
+            }
+        }
+        upward = !upward;
+    }
+}
+
+function drawFormatBits(matrix, reserved, size, eccLevel, mask) {
+    const bits = getFormatBits((eccLevel << 3) | mask);
+    for (let i = 0; i <= 5; i++) matrix[8][i] = ((bits >> i) & 1) !== 0;
+    matrix[8][7] = ((bits >> 6) & 1) !== 0;
+    matrix[8][8] = ((bits >> 7) & 1) !== 0;
+    matrix[7][8] = ((bits >> 8) & 1) !== 0;
+    for (let i = 9; i < 15; i++) matrix[14 - i][8] = ((bits >> i) & 1) !== 0;
+    for (let i = 0; i < 8; i++) matrix[size - 1 - i][8] = ((bits >> i) & 1) !== 0;
+    for (let i = 8; i < 15; i++) matrix[8][size - 15 + i] = ((bits >> i) & 1) !== 0;
+}
+
+function getFormatBits(data) {
+    let value = data << 10;
+    const generator = 0x537;
+    for (let i = 14; i >= 10; i--) {
+        if (((value >> i) & 1) !== 0) value ^= generator << (i - 10);
+    }
+    return ((data << 10) | value) ^ 0x5412;
+}
+
+function reedSolomonRemainder(data, degree) {
+    const generator = reedSolomonGenerator(degree);
+    const result = Array(degree).fill(0);
+    data.forEach(byte => {
+        const factor = byte ^ result.shift();
+        result.push(0);
+        for (let i = 0; i < degree; i++) {
+            result[i] ^= gfMultiply(generator[i], factor);
+        }
+    });
+    return result;
+}
+
+function reedSolomonGenerator(degree) {
+    let result = [1];
+    for (let i = 0; i < degree; i++) {
+        const next = Array(result.length + 1).fill(0);
+        for (let j = 0; j < result.length; j++) {
+            next[j] ^= gfMultiply(result[j], 1);
+            next[j + 1] ^= gfMultiply(result[j], gfPow(2, i));
+        }
+        result = next;
+    }
+    return result.slice(1);
+}
+
+function gfPow(x, power) {
+    let result = 1;
+    for (let i = 0; i < power; i++) result = gfMultiply(result, x);
+    return result;
+}
+
+function gfMultiply(x, y) {
+    let result = 0;
+    while (y > 0) {
+        if (y & 1) result ^= x;
+        x <<= 1;
+        if (x & 0x100) x ^= 0x11d;
+        y >>= 1;
+    }
+    return result;
+}
+
+window.addEventListener("resize", updateInvoiceScale);
+boot();
+</script>
+</body>
+</html>

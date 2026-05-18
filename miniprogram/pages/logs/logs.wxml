@@ -1,0 +1,35 @@
+<navigation-bar title="发票历史" back="{{true}}" color="white" background="transparent"></navigation-bar>
+<scroll-view class="history-scroll" scroll-y type="list">
+  <view class="history-shell">
+    <view class="history-hero">
+      <view class="history-kicker">LOCAL ARCHIVE</view>
+      <view class="history-title">本机发票历史</view>
+      <view class="history-subtitle">支持回填编辑、重新生成，并保留课堂操作痕迹。</view>
+      <button wx:if="{{!empty}}" class="clear-button" bindtap="handleClear">清空历史</button>
+    </view>
+
+    <view wx:if="{{empty}}" class="empty-card">
+      <view class="empty-title">还没有历史记录</view>
+      <view class="empty-text">回到首页生成一张发票后，这里会自动保存最近 100 条。</view>
+    </view>
+
+    <view wx:for="{{cards}}" wx:key="id" wx:for-item="card" class="history-card">
+      <view class="history-top">
+        <view>
+          <view class="history-number">{{card.invoiceNumber}}</view>
+          <view class="history-date">{{card.invoiceDateCn}}</view>
+        </view>
+        <view class="history-total">{{card.grandTotalText}}</view>
+      </view>
+      <view class="history-meta">
+        <view>购买方：{{card.buyerName}}</view>
+        <view>销售方：{{card.sellerName}}</view>
+        <view>保存时间：{{card.savedAt}}</view>
+      </view>
+      <view class="history-actions">
+        <button class="secondary-button" data-index="{{index}}" bindtap="handleLoad">查看/载入</button>
+        <button class="primary-button" data-index="{{index}}" bindtap="handleRegenerate">重新生成</button>
+      </view>
+    </view>
+  </view>
+</scroll-view>
