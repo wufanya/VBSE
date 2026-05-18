@@ -126,7 +126,6 @@ const TAX_RATE_OPTION_VIEWS: PickerOption[] = getTaxRateOptions().map((rate) => 
 })).concat([{ label: '手动', value: MANUAL_TAX_RATE }])
 
 const EXPORT_WIDTH = 750
-const EXPORT_HEIGHT = 1180
 
 let currentPreviewInvoice: InvoiceRecord | null = null
 let toastTimer: number | undefined
@@ -343,19 +342,25 @@ function drawFittedText(
   ctx.fillText(text, x, y)
 }
 
-function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord): void {
+function getPosterHeight(lineCount: number): number {
+  const bodyRows = Math.max(lineCount, 6)
+  return 430 + bodyRows * 24 + 110
+}
+
+function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord): number {
   const ratio = wx.getSystemInfoSync().pixelRatio || 1
   const ctx = canvas.getContext('2d') as WechatMiniprogram.CanvasRenderingContext2D
+  const bodyRows = Math.max(invoice.lines.length, 6)
+  const exportHeight = getPosterHeight(invoice.lines.length)
   canvas.width = EXPORT_WIDTH * ratio
-  canvas.height = EXPORT_HEIGHT * ratio
+  canvas.height = exportHeight * ratio
   ctx.scale(ratio, ratio)
 
   ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, EXPORT_WIDTH, EXPORT_HEIGHT)
+  ctx.fillRect(0, 0, EXPORT_WIDTH, exportHeight)
 
   const borderColor = '#4f4f4f'
   const textColor = '#202020'
-  const mutedColor = '#3a3a3a'
   const tableX = 16
   const tableWidth = 718
 
@@ -365,14 +370,14 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
   drawQrMatrix(ctx, makeQrMatrix(invoice.qrPayload), 42, 22, 22)
 
   ctx.fillStyle = textColor
-  drawFittedText(ctx, '电子发票（普通发票）', 360, 42, 280, 28, 'SimSun, serif', 'center')
+  drawFittedText(ctx, '电子发票（普通发票）', 322, 42, 250, 24, 'SimSun, serif', 'center')
   ctx.beginPath()
-  ctx.moveTo(200, 54)
-  ctx.lineTo(446, 54)
+  ctx.moveTo(194, 54)
+  ctx.lineTo(426, 54)
   ctx.stroke()
 
   ctx.save()
-  ctx.translate(340, 62)
+  ctx.translate(322, 64)
   ctx.rotate(-0.12)
   ctx.strokeStyle = '#6a6a6a'
   ctx.lineWidth = 2
@@ -390,15 +395,15 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
   ctx.restore()
 
   ctx.fillStyle = textColor
-  ctx.fillText('发票号码：', 548, 36)
-  drawFittedText(ctx, invoice.invoiceNumber, 548, 58, 166, 14, 'SimSun, serif')
-  ctx.fillText('开票日期：', 548, 86)
-  drawFittedText(ctx, formatDateCn(invoice.invoiceDate), 548, 108, 166, 14, 'SimSun, serif')
+  ctx.font = '13px SimSun, serif'
+  ctx.textAlign = 'left'
+  drawFittedText(ctx, `发票号码：${invoice.invoiceNumber}`, 532, 40, 178, 13, 'SimSun, serif')
+  drawFittedText(ctx, `开票日期：${formatDateCn(invoice.invoiceDate)}`, 532, 66, 178, 13, 'SimSun, serif')
 
-  const partyTop = 92
-  const labelWidth = 22
-  const contentWidth = 336
-  const partyHeight = 94
+  const partyTop = 88
+  const labelWidth = 32
+  const contentWidth = 327
+  const partyHeight = 112
   ctx.lineWidth = 2
   ctx.strokeRect(tableX, partyTop, tableWidth, partyHeight)
   ctx.beginPath()
@@ -411,37 +416,25 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
   ctx.stroke()
 
   ctx.fillStyle = textColor
-  ctx.font = '15px FangSong, serif'
+  ctx.font = '12px FangSong, serif'
   ctx.textAlign = 'center'
-  ctx.fillText('购', tableX + labelWidth / 2, partyTop + 22)
-  ctx.fillText('买', tableX + labelWidth / 2, partyTop + 42)
-  ctx.fillText('方', tableX + labelWidth / 2, partyTop + 62)
-  ctx.fillText('信', tableX + labelWidth / 2, partyTop + 82)
-  ctx.fillText('息', tableX + labelWidth / 2, partyTop + 102)
-
+  ;['购', '买', '方', '信', '息'].forEach((char, index) => ctx.fillText(char, tableX + labelWidth / 2, partyTop + 18 + index * 18))
   const sellerLabelX = tableX + labelWidth + contentWidth + labelWidth / 2
-  ctx.fillText('销', sellerLabelX, partyTop + 22)
-  ctx.fillText('售', sellerLabelX, partyTop + 42)
-  ctx.fillText('方', sellerLabelX, partyTop + 62)
-  ctx.fillText('信', sellerLabelX, partyTop + 82)
-  ctx.fillText('息', sellerLabelX, partyTop + 102)
+  ;['销', '售', '方', '信', '息'].forEach((char, index) => ctx.fillText(char, sellerLabelX, partyTop + 18 + index * 18))
 
   ctx.textAlign = 'left'
   ctx.font = '14px SimSun, serif'
-  drawFittedText(ctx, `名称：${invoice.buyerName}`, tableX + labelWidth + 10, partyTop + 22, contentWidth - 18, 14, 'SimSun, serif')
+  drawFittedText(ctx, `名称：${invoice.buyerName}`, tableX + labelWidth + 10, partyTop + 22, contentWidth - 16, 13, 'SimSun, serif')
   ctx.fillText('统一社会信用代码/纳税人识别号：', tableX + labelWidth + 10, partyTop + 48)
-  ctx.fillText(invoice.buyerTax, tableX + labelWidth + 10, partyTop + 72)
-
+  ctx.fillText(invoice.buyerTax, tableX + labelWidth + 10, partyTop + 76)
   const sellerTextX = tableX + labelWidth + contentWidth + labelWidth + 10
-  drawFittedText(ctx, `名称：${invoice.sellerName}`, sellerTextX, partyTop + 22, contentWidth - 18, 14, 'SimSun, serif')
+  drawFittedText(ctx, `名称：${invoice.sellerName}`, sellerTextX, partyTop + 22, contentWidth - 16, 13, 'SimSun, serif')
   ctx.fillText('统一社会信用代码/纳税人识别号：', sellerTextX, partyTop + 48)
-  ctx.fillText(invoice.sellerTax, sellerTextX, partyTop + 72)
+  ctx.fillText(invoice.sellerTax, sellerTextX, partyTop + 76)
 
-  const goodsTop = 188
+  const goodsTop = 208
   const headerHeight = 22
   const rowHeight = 24
-  const emptyRows = 6
-  const bodyRows = Math.max(invoice.lines.length, emptyRows)
   const totalRows = bodyRows + 1
   const goodsHeight = headerHeight + bodyRows * rowHeight + rowHeight
   const colWidths = [188, 62, 72, 116, 108, 88, 84]
@@ -541,6 +534,8 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
   ctx.fillText('复核：', 160, remarkTop + 56)
   ctx.textAlign = 'left'
   ctx.fillText('实训票据，仅供教学使用', 226, remarkTop + 56)
+
+  return exportHeight
 }
 
 Page<InvoicePageData>({
@@ -846,14 +841,14 @@ Page<InvoicePageData>({
         return
       }
 
-      renderPoster(canvas, invoice)
+      const exportHeight = renderPoster(canvas, invoice)
       setTimeout(() => {
         wx.canvasToTempFilePath({
           canvas,
           width: EXPORT_WIDTH,
-          height: EXPORT_HEIGHT,
+          height: exportHeight,
           destWidth: EXPORT_WIDTH * 2,
-          destHeight: EXPORT_HEIGHT * 2,
+          destHeight: exportHeight * 2,
           fileType: 'png',
           success: (exportResult) => {
             wx.saveImageToPhotosAlbum({
