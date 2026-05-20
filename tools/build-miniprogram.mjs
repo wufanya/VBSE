@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import ts from 'typescript'
-import sass from 'sass'
+import * as sass from 'sass'
 
 const projectRoot = process.cwd()
 const miniprogramRoot = path.join(projectRoot, 'miniprogram')

@@ -1,14 +1,26 @@
 {
-  "name": "miniprogram-ts-sass-quickstart",
+  "name": "vbse-invoice-miniprogram",
   "version": "1.0.0",
-  "description": "",
+  "description": "VBSE 发票教学微信小程序",
   "scripts": {
     "build:mp": "node tools/build-miniprogram.mjs",
-    "test": "node --experimental-strip-types tests/run-tests.ts"
+    "test": "node --experimental-strip-types tests/run-tests.ts",
+    "verify": "npm run build:mp && npm test"
   },
-  "keywords": [],
+  "keywords": [
+    "wechat-miniprogram",
+    "vbse",
+    "invoice",
+    "teaching"
+  ],
   "author": "",
-  "license": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wufanya/VBSE.git"
+  },
   "devDependencies": {
     "miniprogram-api-typings": "^2.8.3-1",
     "sass": "^1.99.0",
