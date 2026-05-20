@@ -77,6 +77,9 @@ test('validateInvoiceDraft rejects missing or invalid invoice fields', () => {
 })
 
 test('findCompanyValue matches preset company or falls back to manual', () => {
+  assert.equal(COMPANY_OPTIONS.length, 23)
+  assert.ok(COMPANY_OPTIONS.some((company) => company.name === '爱贝尔童车制造有限公司'))
+  assert.ok(COMPANY_OPTIONS.some((company) => company.name === '新耀工贸有限公司'))
   assert.equal(
     findCompanyValue(COMPANY_OPTIONS[0].name, COMPANY_OPTIONS[0].taxId),
     '0'

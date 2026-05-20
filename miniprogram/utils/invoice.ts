@@ -57,7 +57,7 @@ export const COMPANY_OPTIONS: CompanyOption[] = [
   { name: '宝乐童车制造有限公司', taxId: '110108809018632001' },
   { name: '小精灵童车制造有限公司', taxId: '110108809018633002' },
   { name: '童飞童车制造有限公司', taxId: '110108809018634003' },
-  { name: '爱贝儿童车制造有限公司', taxId: '110108809018635004' },
+  { name: '爱贝尔童车制造有限公司', taxId: '110108809018635004' },
   { name: '豆豆熊童车制造有限公司', taxId: '110108809018636005' },
   { name: '五彩梦童车制造有限公司', taxId: '110108809018637006' },
   { name: '旭日商贸有限公司', taxId: '110108554831327011' },
@@ -67,7 +67,7 @@ export const COMPANY_OPTIONS: CompanyOption[] = [
   { name: '恒通工贸有限公司', taxId: '110000001012587015' },
   { name: '邦尼工贸有限公司', taxId: '110106311235740016' },
   { name: '思远工贸有限公司', taxId: '110020001012524017' },
-  { name: '新越工贸有限公司', taxId: '110113050173019018' },
+  { name: '新耀工贸有限公司', taxId: '110113050173019018' },
   { name: '隆飞物流有限公司', taxId: '100108231234856019' },
   { name: '百联集团有限公司', taxId: '100108666987335020' },
   { name: '五洲进出口有限公司', taxId: '110108120101688021' },
@@ -241,8 +241,8 @@ export function buildInvoice(
   const grandTotal = totalAmount + totalTax
 
   const invoice: InvoiceRecord = {
-    id: options?.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    savedAt: options?.savedAt || new Date().toISOString(),
+    id: (options && options.id) || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    savedAt: (options && options.savedAt) || new Date().toISOString(),
     invoiceNumber: draft.invoiceNumber.trim() || DEFAULT_INVOICE_NUMBER,
     invoiceDate: draft.invoiceDate,
     buyerName: draft.buyerName.trim(),
@@ -264,7 +264,7 @@ export function buildInvoice(
       invoiceDate: invoice.invoiceDate,
       qrPayload: draft.qrPayload,
     },
-    options?.forceNewQr ?? false
+    options && options.forceNewQr !== undefined ? options.forceNewQr : false
   )
 
   return invoice

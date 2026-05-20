@@ -1,201 +1,208 @@
 <navigation-bar title="VBSE 发票工坊" back="{{false}}" color="white" background="transparent"></navigation-bar>
-<scroll-view class="page-scroll" scroll-y type="list">
-  <view class="page-shell">
-    <view class="hero-card">
-      <view class="hero-kicker">VBSE TRAINING INVOICE LAB</view>
-      <view class="hero-title">电子发票教学版小程序</view>
-      <view class="hero-subtitle">手机端录入、即时预览、历史回填，保留课堂实训的工作台感。</view>
-      <view class="hero-meta">
-        <view class="hero-pill">历史 {{historyCount}} 条</view>
-        <view class="hero-pill">下一号码 {{nextInvoiceNumber}}</view>
-      </view>
-    </view>
 
-    <view class="panel">
-      <view class="panel-head">
-        <view class="panel-title">基础信息</view>
-        <view class="panel-note">开票日期与号码会联动到预览成品</view>
-      </view>
-      <view class="two-grid">
-        <view class="field-card">
-          <view class="field-label">发票号码</view>
-          <input class="field-input" value="{{invoiceNumber}}" data-field="invoiceNumber" bindinput="onFieldInput" />
-        </view>
-        <view class="field-card">
-          <view class="field-label">开票日期</view>
-          <picker mode="date" value="{{invoiceDate}}" bindchange="onDateChange">
-            <view class="picker-value">{{invoiceDate}}</view>
-          </picker>
+<view class="page-root">
+  <scroll-view class="page-scroll" scroll-y type="list">
+    <view class="page-shell">
+      <view class="hero-card">
+        <view class="hero-kicker">VBSE TRAINING INVOICE LAB</view>
+        <view class="hero-title">电子发票教学版小程序</view>
+        <view class="hero-subtitle">手机录入、即时预览、历史回填，保留课堂实训的工作台感。</view>
+        <view class="hero-meta">
+          <view class="hero-pill">历史 {{historyCount}} 条</view>
+          <view class="hero-pill">下一号码 {{nextInvoiceNumber}}</view>
         </view>
       </view>
-    </view>
 
-    <view class="panel">
-      <view class="panel-head">
-        <view class="panel-title">购买方与销售方</view>
-      </view>
-      <view class="party-stack compact-stack">
-        <view class="party-card">
-          <view class="party-head">
-            <view class="party-title">购买方</view>
-            <picker mode="selector" range="{{companyOptionViews}}" range-key="label" value="{{buyerCompanyIndex}}" bindchange="onCompanyChange" data-role="buyer">
-              <view class="picker-tag">{{buyerCompanyIndex === companyOptionViews.length - 1 ? '手动输入' : '企业库'}}</view>
+      <view class="panel">
+        <view class="panel-head">
+          <view class="panel-title">基础信息</view>
+          <view class="panel-note">开票日期和号码会同步到预览成品</view>
+        </view>
+        <view class="two-grid">
+          <view class="field-card">
+            <view class="field-label">发票号码</view>
+            <input class="field-input" value="{{invoiceNumber}}" data-field="invoiceNumber" bindinput="onFieldInput" />
+          </view>
+          <view class="field-card">
+            <view class="field-label">开票日期</view>
+            <picker mode="date" value="{{invoiceDate}}" bindchange="onDateChange">
+              <view class="picker-value">{{invoiceDate}}</view>
             </picker>
           </view>
-          <picker mode="selector" range="{{companyOptionViews}}" range-key="label" value="{{buyerCompanyIndex}}" bindchange="onCompanyChange" data-role="buyer">
-            <view class="company-bar">{{buyerName || companyOptionViews[buyerCompanyIndex].label}}</view>
-          </picker>
-          <view class="party-form-grid">
-            <input class="field-input tight-input" placeholder="购买方名称" value="{{buyerName}}" data-field="buyerName" bindinput="onFieldInput" />
-            <input class="field-input tight-input" placeholder="统一社会信用代码/纳税人识别号" value="{{buyerTax}}" data-field="buyerTax" bindinput="onFieldInput" />
-          </view>
-        </view>
-
-        <view class="party-card">
-          <view class="party-head">
-            <view class="party-title">销售方</view>
-            <picker mode="selector" range="{{companyOptionViews}}" range-key="label" value="{{sellerCompanyIndex}}" bindchange="onCompanyChange" data-role="seller">
-              <view class="picker-tag">{{sellerCompanyIndex === companyOptionViews.length - 1 ? '手动输入' : '企业库'}}</view>
-            </picker>
-          </view>
-          <picker mode="selector" range="{{companyOptionViews}}" range-key="label" value="{{sellerCompanyIndex}}" bindchange="onCompanyChange" data-role="seller">
-            <view class="company-bar">{{sellerName || companyOptionViews[sellerCompanyIndex].label}}</view>
-          </picker>
-          <view class="party-form-grid">
-            <input class="field-input tight-input" placeholder="销售方名称" value="{{sellerName}}" data-field="sellerName" bindinput="onFieldInput" />
-            <input class="field-input tight-input" placeholder="统一社会信用代码/纳税人识别号" value="{{sellerTax}}" data-field="sellerTax" bindinput="onFieldInput" />
-          </view>
         </view>
       </view>
-    </view>
 
-    <view class="panel">
-      <view class="panel-head">
-        <view class="panel-title">项目明细</view>
-      </view>
-      <view class="line-stack">
-        <view wx:for="{{lines}}" wx:key="index" wx:for-item="line" class="line-card">
-          <view class="line-card-head">
-            <view class="line-card-title">明细 {{index + 1}}</view>
-            <button class="line-delete-btn" data-index="{{index}}" bindtap="removeLine">删除</button>
-          </view>
-          <input class="field-input tight-input" placeholder="项目/货物名称" value="{{line.name}}" data-index="{{index}}" data-field="name" bindinput="onLineInput" />
-          <view class="two-grid">
-            <input class="field-input tight-input" placeholder="单位" value="{{line.unit}}" data-index="{{index}}" data-field="unit" bindinput="onLineInput" />
-            <input class="field-input tight-input" type="digit" placeholder="数量" value="{{line.qty}}" data-index="{{index}}" data-field="qty" bindinput="onLineInput" />
-          </view>
-          <view class="two-grid">
-            <input class="field-input tight-input" type="digit" placeholder="不含税单价" value="{{line.price}}" data-index="{{index}}" data-field="price" bindinput="onLineInput" />
-            <picker mode="selector" range="{{taxRateOptions}}" range-key="label" value="{{line.taxRateIndex}}" bindchange="onTaxRateChange" data-index="{{index}}">
-              <view class="picker-value tight-input">{{line.taxRateLabel}}</view>
-            </picker>
-          </view>
-          <input wx:if="{{line.taxRateValue === 'manual'}}" class="field-input tight-input" type="digit" placeholder="请输入税率百分比，如 5.5" value="{{line.taxRateManual}}" data-index="{{index}}" data-field="taxRateManual" bindinput="onLineInput" />
-          <view class="line-metrics">
-            <view class="metric-chip">金额 {{line.amountText}}</view>
-            <view class="metric-chip">税额 {{line.taxAmountText}}</view>
-          </view>
+      <view class="panel">
+        <view class="panel-head">
+          <view class="panel-title">购方与销方</view>
         </view>
-      </view>
-      <button class="ghost-button" bindtap="addLine">增加一行</button>
-    </view>
-
-    <view class="panel">
-      <view class="panel-head">
-        <view class="panel-title">备注与操作</view>
-      </view>
-      <view class="two-grid action-top-grid">
-        <input class="field-input tight-input" placeholder="开票人" value="{{drawer}}" data-field="drawer" bindinput="onFieldInput" />
-        <button class="secondary-button" bindtap="goHistory">查看历史</button>
-      </view>
-      <textarea class="field-textarea" placeholder="备注信息" value="{{remark}}" data-field="remark" bindinput="onFieldInput"></textarea>
-      <view class="action-grid">
-        <button class="secondary-button" bindtap="fillSample">填入示例</button>
-        <button class="secondary-button" bindtap="resetForm">清空重填</button>
-        <button class="primary-button" bindtap="generateInvoice">生成发票</button>
-        <button class="ghost-button" bindtap="savePreviewImage">保存图片</button>
-      </view>
-      <view wx:if="{{toastMessage}}" class="toast-card">{{toastMessage}}</view>
-    </view>
-
-    <view class="preview-shell">
-      <view class="preview-label">PREVIEW</view>
-      <view class="invoice-card">
-        <view class="invoice-header">
-          <view class="invoice-topbar">
-            <canvas id="previewQrCanvas" type="2d" class="qr-canvas"></canvas>
-            <view class="invoice-title-wrap">
-              <view class="invoice-title">电子发票（普通发票）</view>
-              <view class="invoice-rule"></view>
-              <view class="seal">全国统一发票监制章 <text class="seal-small">税务总局</text></view>
+        <view class="party-stack compact-stack">
+          <view class="party-card">
+            <view class="party-head">
+              <view class="party-title">购买方</view>
+              <picker mode="selector" range="{{companyOptionViews}}" range-key="label" value="{{buyerCompanyIndex}}" bindchange="onCompanyChange" data-role="buyer">
+                <view class="picker-tag">{{buyerCompanyIndex === companyOptionViews.length - 1 ? '手动输入' : '快速选择企业'}}</view>
+              </picker>
             </view>
-            <view class="invoice-meta">
-              <view class="meta-item">发票号码：{{previewInvoiceNumber}}</view>
-              <view class="meta-item">开票日期：{{previewInvoiceDateCn}}</view>
+            <view class="party-form-grid">
+              <input class="field-input tight-input" placeholder="购买方名称" value="{{buyerName}}" data-field="buyerName" bindinput="onFieldInput" />
+              <input class="field-input tight-input" placeholder="统一社会信用代码/纳税人识别号" value="{{buyerTax}}" data-field="buyerTax" bindinput="onFieldInput" />
+            </view>
+          </view>
+
+          <view class="party-card">
+            <view class="party-head">
+              <view class="party-title">销售方</view>
+              <picker mode="selector" range="{{companyOptionViews}}" range-key="label" value="{{sellerCompanyIndex}}" bindchange="onCompanyChange" data-role="seller">
+                <view class="picker-tag">{{sellerCompanyIndex === companyOptionViews.length - 1 ? '手动输入' : '快速选择企业'}}</view>
+              </picker>
+            </view>
+            <view class="party-form-grid">
+              <input class="field-input tight-input" placeholder="销售方名称" value="{{sellerName}}" data-field="sellerName" bindinput="onFieldInput" />
+              <input class="field-input tight-input" placeholder="统一社会信用代码/纳税人识别号" value="{{sellerTax}}" data-field="sellerTax" bindinput="onFieldInput" />
             </view>
           </view>
         </view>
+      </view>
 
-        <view class="invoice-party-table">
-          <view class="party-label-cell">购买方信息</view>
-          <view class="party-content-cell">
-            <view><text class="caption-text">名称：</text>{{previewBuyerName}}</view>
-            <view><text class="caption-text">统一社会信用代码/纳税人识别号：</text>{{previewBuyerTax}}</view>
-          </view>
-          <view class="party-label-cell">销售方信息</view>
-          <view class="party-content-cell">
-            <view><text class="caption-text">名称：</text>{{previewSellerName}}</view>
-            <view><text class="caption-text">统一社会信用代码/纳税人识别号：</text>{{previewSellerTax}}</view>
+      <view class="panel">
+        <view class="panel-head">
+          <view class="panel-title">项目明细</view>
+        </view>
+        <view class="line-stack">
+          <view wx:for="{{lines}}" wx:key="index" wx:for-item="line" wx:for-index="index" class="line-card">
+            <view class="line-card-head">
+              <view class="line-card-title">明细 {{index + 1}}</view>
+              <button class="line-delete-btn" data-index="{{index}}" bindtap="removeLine">删除</button>
+            </view>
+            <input class="field-input tight-input" placeholder="项目/货物名称" value="{{line.name}}" data-index="{{index}}" data-field="name" bindinput="onLineInput" />
+            <view class="two-grid">
+              <input class="field-input tight-input" placeholder="单位" value="{{line.unit}}" data-index="{{index}}" data-field="unit" bindinput="onLineInput" />
+              <input class="field-input tight-input" type="digit" placeholder="数量" value="{{line.qty}}" data-index="{{index}}" data-field="qty" bindinput="onLineInput" />
+            </view>
+            <view class="two-grid">
+              <input class="field-input tight-input" type="digit" placeholder="不含税单价" value="{{line.price}}" data-index="{{index}}" data-field="price" bindinput="onLineInput" />
+              <picker mode="selector" range="{{taxRateOptions}}" range-key="label" value="{{line.taxRateIndex}}" bindchange="onTaxRateChange" data-index="{{index}}">
+                <view class="picker-value tight-input">{{line.taxRateLabel}}</view>
+              </picker>
+            </view>
+            <input wx:if="{{line.taxRateValue === 'manual'}}" class="field-input tight-input" type="digit" placeholder="请输入税率百分比，如 5.5" value="{{line.taxRateManual}}" data-index="{{index}}" data-field="taxRateManual" bindinput="onLineInput" />
+            <view class="line-metrics">
+              <view class="metric-chip">金额 {{line.amountText}}</view>
+              <view class="metric-chip">税额 {{line.taxAmountText}}</view>
+            </view>
           </view>
         </view>
-
-        <view class="goods-table">
-          <view class="goods-head invoice-grid">
-            <text>项目</text>
-            <text>单位</text>
-            <text>数量</text>
-            <text>单价</text>
-            <text>金额</text>
-            <text>税率</text>
-            <text>税额</text>
-          </view>
-          <view wx:for="{{previewRows}}" wx:key="index" wx:for-item="row" class="goods-row invoice-grid {{row.empty ? 'is-empty' : ''}}">
-            <text>{{row.name}}</text>
-            <text>{{row.unit}}</text>
-            <text>{{row.qtyText}}</text>
-            <text>{{row.priceText}}</text>
-            <text>{{row.amountText}}</text>
-            <text>{{row.taxRateText}}</text>
-            <text>{{row.taxAmountText}}</text>
-          </view>
-          <view class="goods-total-row invoice-grid">
-            <text class="goods-total-merge">合计</text>
-            <text>{{previewTotalAmount}}</text>
-            <text></text>
-            <text>{{previewTotalTax}}</text>
-          </view>
-        </view>
-
-        <view class="amount-table">
-          <view class="amount-row">
-            <view class="amount-label">价税合计（大写）</view>
-            <view class="amount-upper">{{previewUpperAmount}}</view>
-            <view class="amount-small">（小写）{{previewGrandTotal}}</view>
-          </view>
-          <view class="remark-row">
-            <view class="remark-label">备注</view>
-            <view class="remark-inline-content">{{previewRemark}}</view>
-          </view>
-        </view>
-
-        <view class="invoice-footer">
-          <text>开票人：{{previewDrawer}}</text>
-          <text>复核：</text>
-          <text>实训票据，仅供教学使用</text>
+        <view class="add-line-button" bindtap="addLine">
+          <text class="add-line-icon">+</text>
+          <text>增加一行</text>
         </view>
       </view>
-    </view>
 
-    <canvas id="exportCanvas" type="2d" class="export-canvas"></canvas>
+      <view class="panel">
+        <view class="panel-head">
+          <view class="panel-title">备注与操作</view>
+        </view>
+        <view class="two-grid action-top-grid">
+          <input class="field-input tight-input" placeholder="开票人" value="{{drawer}}" data-field="drawer" bindinput="onFieldInput" />
+          <button class="secondary-button" bindtap="goHistory">查看历史</button>
+        </view>
+        <textarea class="field-textarea" placeholder="备注信息" value="{{remark}}" data-field="remark" bindinput="onFieldInput"></textarea>
+        <view class="action-grid">
+          <view class="secondary-button action-button" bindtap="fillSample">填入示例</view>
+          <view class="secondary-button action-button" bindtap="resetForm">清空重填</view>
+        </view>
+        <view wx:if="{{toastMessage}}" class="toast-card">{{toastMessage}}</view>
+      </view>
+
+      <view class="preview-shell">
+        <view class="preview-head">
+          <view class="preview-label">PREVIEW</view>
+          <view class="preview-note">生成后的教学发票预览</view>
+        </view>
+        <view class="invoice-card">
+          <view class="invoice-header">
+            <view class="invoice-topbar">
+              <canvas id="previewQrCanvas" type="2d" class="qr-canvas"></canvas>
+              <view class="invoice-title-wrap">
+                <view class="invoice-title">电子发票（普通发票）</view>
+                <view class="invoice-rule"></view>
+                <view class="seal">全国统一发票监制章<text class="seal-small">税务总局</text></view>
+              </view>
+              <view class="invoice-meta">
+                <view class="meta-item">发票号码：{{previewInvoiceNumber}}</view>
+                <view class="meta-item">开票日期：{{previewInvoiceDateCn}}</view>
+              </view>
+            </view>
+          </view>
+
+          <view class="invoice-party-table">
+            <view class="party-label-cell">购买方信息</view>
+            <view class="party-content-cell">
+              <view><text class="caption-text">名称：</text>{{previewBuyerName}}</view>
+              <view><text class="caption-text">统一社会信用代码/纳税人识别号：</text>{{previewBuyerTax}}</view>
+            </view>
+            <view class="party-label-cell">销售方信息</view>
+            <view class="party-content-cell">
+              <view><text class="caption-text">名称：</text>{{previewSellerName}}</view>
+              <view><text class="caption-text">统一社会信用代码/纳税人识别号：</text>{{previewSellerTax}}</view>
+            </view>
+          </view>
+
+          <view class="goods-table">
+            <view class="goods-head invoice-grid">
+              <text>项目</text>
+              <text>单位</text>
+              <text>数量</text>
+              <text>单价</text>
+              <text>金额</text>
+              <text>税率</text>
+              <text>税额</text>
+            </view>
+            <view wx:for="{{previewRows}}" wx:key="index" wx:for-item="row" class="goods-row invoice-grid {{row.empty ? 'is-empty' : ''}}">
+              <text>{{row.name}}</text>
+              <text>{{row.unit}}</text>
+              <text>{{row.qtyText}}</text>
+              <text>{{row.priceText}}</text>
+              <text>{{row.amountText}}</text>
+              <text>{{row.taxRateText}}</text>
+              <text>{{row.taxAmountText}}</text>
+            </view>
+            <view class="goods-total-row invoice-grid">
+              <text class="goods-total-merge">合计</text>
+              <text>{{previewTotalAmount}}</text>
+              <text></text>
+              <text>{{previewTotalTax}}</text>
+            </view>
+          </view>
+
+          <view class="amount-table">
+            <view class="amount-row">
+              <view class="amount-label">价税合计（大写）</view>
+              <view class="amount-upper">{{previewUpperAmount}}</view>
+              <view class="amount-small">（小写）{{previewGrandTotal}}</view>
+            </view>
+            <view class="remark-row">
+              <view class="remark-label">备注</view>
+              <view class="remark-inline-content">{{previewRemark}}</view>
+            </view>
+          </view>
+
+          <view class="invoice-footer">
+            <text>开票人：{{previewDrawer}}</text>
+            <text>复核：</text>
+            <text>实训票据，仅供教学使用</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="bottom-spacer"></view>
+      <canvas id="exportCanvas" type="2d" class="export-canvas"></canvas>
+    </view>
+  </scroll-view>
+
+  <view class="floating-action-bar">
+    <button class="floating-primary-button" bindtap="generateInvoice">生成发票</button>
+    <button class="floating-secondary-button" bindtap="savePreviewImage">保存图片</button>
   </view>
-</scroll-view>
+</view>

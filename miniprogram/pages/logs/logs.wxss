@@ -1,0 +1,135 @@
+page {
+  min-height: 100vh;
+  background: radial-gradient(circle at top right, rgba(162, 56, 32, 0.18), transparent 28%), linear-gradient(180deg, #f7efe3 0%, #f0e2d0 100%);
+}
+
+.history-scroll {
+  height: 100vh;
+}
+
+.history-shell {
+  padding: 28rpx 24rpx 40rpx;
+}
+
+.history-hero,
+.history-card,
+.empty-card {
+  border-radius: 32rpx;
+  box-shadow: 0 18rpx 48rpx rgba(84, 43, 18, 0.08);
+}
+
+.history-hero {
+  padding: 34rpx 28rpx;
+  background: linear-gradient(135deg, #6f1f1b 0%, #bc5a33 62%, #eab977 100%);
+  color: #fff7ef;
+}
+
+.history-kicker {
+  font-size: 20rpx;
+  letter-spacing: 6rpx;
+  opacity: 0.8;
+}
+
+.history-title {
+  margin-top: 18rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+}
+
+.history-subtitle {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.clear-button,
+.primary-button,
+.secondary-button {
+  min-height: 82rpx;
+  border-radius: 22rpx;
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.clear-button {
+  margin-top: 22rpx;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fffaf4;
+}
+
+.empty-card {
+  margin-top: 24rpx;
+  padding: 42rpx 32rpx;
+  background: rgba(255, 251, 246, 0.95);
+}
+
+.empty-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #69261f;
+}
+
+.empty-text {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.8;
+  color: #8d6b53;
+}
+
+.history-card {
+  margin-top: 24rpx;
+  padding: 28rpx 24rpx;
+  background: rgba(255, 251, 246, 0.96);
+  border: 1rpx solid rgba(162, 120, 72, 0.1);
+}
+
+.history-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.history-number {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #6e221b;
+}
+
+.history-date {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #936a51;
+}
+
+.history-total {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: #f4e7d7;
+  color: #884227;
+  font-size: 24rpx;
+}
+
+.history-meta {
+  margin-top: 18rpx;
+  font-size: 24rpx;
+  line-height: 1.8;
+  color: #5d4a3c;
+}
+
+.history-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 22rpx;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #8f241d 0%, #bf5a31 100%);
+  color: #fff9f1;
+}
+
+.secondary-button {
+  background: #f0e1cd;
+  color: #6f4022;
+}

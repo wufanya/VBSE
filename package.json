@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "build:mp": "node tools/build-miniprogram.mjs",
     "test": "node --experimental-strip-types tests/run-tests.ts"
   },
   "keywords": [],
   "author": "",
   "license": "",
-  "dependencies": {
-  },
   "devDependencies": {
-    "miniprogram-api-typings": "^2.8.3-1"
+    "miniprogram-api-typings": "^2.8.3-1",
+    "sass": "^1.99.0",
+    "typescript": "^6.0.3"
   }
 }

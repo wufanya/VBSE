@@ -1,4 +1,5 @@
 import {
+  COMPANY_OPTIONS,
   MANUAL_COMPANY,
   MANUAL_TAX_RATE,
   buildInvoice,
@@ -93,32 +94,9 @@ interface InvoicePageData {
   nextInvoiceNumber: string
 }
 
-const COMPANY_OPTION_VIEWS: PickerOption[] = [
-  { label: '宝乐童车制造有限公司', value: '0' },
-  { label: '小精灵童车制造有限公司', value: '1' },
-  { label: '童飞童车制造有限公司', value: '2' },
-  { label: '爱贝儿童车制造有限公司', value: '3' },
-  { label: '豆豆熊童车制造有限公司', value: '4' },
-  { label: '五彩梦童车制造有限公司', value: '5' },
-  { label: '旭日商贸有限公司', value: '6' },
-  { label: '华晨商贸有限公司', value: '7' },
-  { label: '仁和商贸有限公司', value: '8' },
-  { label: '天府商贸有限公司', value: '9' },
-  { label: '恒通工贸有限公司', value: '10' },
-  { label: '邦尼工贸有限公司', value: '11' },
-  { label: '思远工贸有限公司', value: '12' },
-  { label: '新越工贸有限公司', value: '13' },
-  { label: '隆飞物流有限公司', value: '14' },
-  { label: '百联集团有限公司', value: '15' },
-  { label: '五洲进出口有限公司', value: '16' },
-  { label: '立新会计师事务所', value: '17' },
-  { label: '新华招投标有限公司', value: '18' },
-  { label: '融通综合服务有限公司', value: '19' },
-  { label: '中国工商银行北京分行营业部', value: '20' },
-  { label: '中国银行北京分行营业部', value: '21' },
-  { label: '进出口服务中心', value: '22' },
-  { label: '手动输入企业', value: MANUAL_COMPANY },
-]
+const COMPANY_OPTION_VIEWS: PickerOption[] = COMPANY_OPTIONS
+  .map((company, index) => ({ label: company.name, value: String(index) }))
+  .concat([{ label: '手动输入企业', value: MANUAL_COMPANY }])
 
 const TAX_RATE_OPTION_VIEWS: PickerOption[] = getTaxRateOptions().map((rate) => ({
   label: `${formatTaxPercent(rate)}%`,
@@ -158,7 +136,7 @@ function toLineView(line: InvoiceLineDraft): LineView {
     taxRateValue,
     taxRateManual: taxRateValue === MANUAL_TAX_RATE ? formatTaxPercent(taxRate) : '',
     taxRateIndex,
-    taxRateLabel: TAX_RATE_OPTION_VIEWS[taxRateIndex]?.label || '手动',
+    taxRateLabel: (TAX_RATE_OPTION_VIEWS[taxRateIndex] && TAX_RATE_OPTION_VIEWS[taxRateIndex].label) || '手动',
     amountText: formatMoney(amount),
     taxAmountText: formatMoney(taxAmount),
   }
@@ -342,9 +320,21 @@ function drawFittedText(
   ctx.fillText(text, x, y)
 }
 
+function drawVerticalLabel(
+  ctx: WechatMiniprogram.CanvasRenderingContext2D,
+  chars: string[],
+  x: number,
+  y: number,
+  lineHeight: number
+): void {
+  chars.forEach((char, index) => {
+    ctx.fillText(char, x, y + index * lineHeight)
+  })
+}
+
 function getPosterHeight(lineCount: number): number {
   const bodyRows = Math.max(lineCount, 6)
-  return 430 + bodyRows * 24 + 110
+  return 462 + bodyRows * 24 + 110
 }
 
 function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord): number {
@@ -366,44 +356,45 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
 
   ctx.strokeStyle = borderColor
   ctx.lineWidth = 2
-  ctx.strokeRect(16, 18, 54, 54)
-  drawQrMatrix(ctx, makeQrMatrix(invoice.qrPayload), 42, 22, 22)
+  ctx.strokeRect(18, 20, 62, 62)
+  drawQrMatrix(ctx, makeQrMatrix(invoice.qrPayload), 50, 24, 26)
 
-  ctx.fillStyle = textColor
-  drawFittedText(ctx, '电子发票（普通发票）', 322, 42, 250, 24, 'SimSun, serif', 'center')
+  ctx.fillStyle = '#9d1f18'
+  drawFittedText(ctx, '电子发票（普通发票）', 344, 38, 320, 27, 'KaiTi, SimSun, serif', 'center', '400', 20)
+  ctx.strokeStyle = '#9d1f18'
+  ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(194, 54)
-  ctx.lineTo(426, 54)
+  ctx.moveTo(202, 56)
+  ctx.lineTo(486, 56)
   ctx.stroke()
 
   ctx.save()
-  ctx.translate(322, 64)
+  ctx.translate(344, 92)
   ctx.rotate(-0.12)
-  ctx.strokeStyle = '#6a6a6a'
+  ctx.strokeStyle = '#a83a32'
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.ellipse(0, 0, 44, 28, 0, 0, Math.PI * 2)
+  ctx.ellipse(0, 0, 64, 34, 0, 0, Math.PI * 2)
   ctx.stroke()
   ctx.beginPath()
-  ctx.ellipse(0, 0, 40, 24, 0, 0, Math.PI * 2)
+  ctx.ellipse(0, 0, 58, 29, 0, 0, Math.PI * 2)
   ctx.stroke()
-  ctx.fillStyle = '#6a6a6a'
-  ctx.font = '14px KaiTi, serif'
+  ctx.fillStyle = '#a83a32'
+  ctx.font = '12px KaiTi, SimSun, serif'
   ctx.textAlign = 'center'
-  ctx.fillText('全国统一发票监制章', 0, -10)
-  ctx.fillText('税 务 总 局', 0, 12)
+  ctx.fillText('全国统一发票监制章', 0, -9)
+  ctx.font = '11px KaiTi, SimSun, serif'
+  ctx.fillText('税  务  总  局', 0, 12)
   ctx.restore()
 
   ctx.fillStyle = textColor
-  ctx.font = '13px SimSun, serif'
-  ctx.textAlign = 'left'
-  drawFittedText(ctx, `发票号码：${invoice.invoiceNumber}`, 532, 40, 178, 13, 'SimSun, serif')
-  drawFittedText(ctx, `开票日期：${formatDateCn(invoice.invoiceDate)}`, 532, 66, 178, 13, 'SimSun, serif')
+  drawFittedText(ctx, `发票号码：${invoice.invoiceNumber}`, 514, 44, 206, 12, 'SimSun, serif')
+  drawFittedText(ctx, `开票日期：${formatDateCn(invoice.invoiceDate)}`, 514, 70, 206, 12, 'SimSun, serif')
 
-  const partyTop = 88
-  const labelWidth = 32
+  const partyTop = 126
+  const labelWidth = 34
   const contentWidth = 327
-  const partyHeight = 112
+  const partyHeight = 116
   ctx.lineWidth = 2
   ctx.strokeRect(tableX, partyTop, tableWidth, partyHeight)
   ctx.beginPath()
@@ -416,11 +407,11 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
   ctx.stroke()
 
   ctx.fillStyle = textColor
-  ctx.font = '12px FangSong, serif'
+  ctx.font = '12px FangSong, SimSun, serif'
   ctx.textAlign = 'center'
-  ;['购', '买', '方', '信', '息'].forEach((char, index) => ctx.fillText(char, tableX + labelWidth / 2, partyTop + 18 + index * 18))
+  drawVerticalLabel(ctx, ['购', '买', '方', '信', '息'], tableX + labelWidth / 2, partyTop + 22, 17)
   const sellerLabelX = tableX + labelWidth + contentWidth + labelWidth / 2
-  ;['销', '售', '方', '信', '息'].forEach((char, index) => ctx.fillText(char, sellerLabelX, partyTop + 18 + index * 18))
+  drawVerticalLabel(ctx, ['销', '售', '方', '信', '息'], sellerLabelX, partyTop + 22, 17)
 
   ctx.textAlign = 'left'
   ctx.font = '14px SimSun, serif'
@@ -432,7 +423,7 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
   ctx.fillText('统一社会信用代码/纳税人识别号：', sellerTextX, partyTop + 48)
   ctx.fillText(invoice.sellerTax, sellerTextX, partyTop + 76)
 
-  const goodsTop = 208
+  const goodsTop = 250
   const headerHeight = 22
   const rowHeight = 24
   const totalRows = bodyRows + 1
@@ -807,7 +798,7 @@ Page<InvoicePageData>({
   updateQrCanvas(text: string) {
     const query = wx.createSelectorQuery().in(this)
     query.select('#previewQrCanvas').fields({ node: true, size: true }).exec((result) => {
-      const canvas = result[0]?.node as WechatMiniprogram.Canvas | undefined
+      const canvas = result[0] ? result[0].node as WechatMiniprogram.Canvas : undefined
       if (!canvas) return
       const ratio = wx.getSystemInfoSync().pixelRatio || 1
       canvas.width = 132 * ratio
@@ -835,7 +826,7 @@ Page<InvoicePageData>({
 
     const query = wx.createSelectorQuery().in(this)
     query.select('#exportCanvas').fields({ node: true, size: true }).exec((result) => {
-      const canvas = result[0]?.node as WechatMiniprogram.Canvas | undefined
+      const canvas = result[0] ? result[0].node as WechatMiniprogram.Canvas : undefined
       if (!canvas) {
         this.showToast('导出画布初始化失败')
         return
