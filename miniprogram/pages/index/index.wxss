@@ -343,6 +343,18 @@ button::after {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+}
+
+.history-button {
+  width: 100%;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.tap-hover {
+  transform: scale(0.985);
+  opacity: 0.9;
 }
 
 .panel .secondary-button,

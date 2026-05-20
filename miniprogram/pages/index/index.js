@@ -698,6 +698,9 @@ Page({
         });
     },
     goHistory() {
-        wx.navigateTo({ url: '../logs/logs' });
+        wx.navigateTo({
+            url: '/pages/logs/logs',
+            fail: () => this.showToast('历史页打开失败，请重新编译后再试'),
+        });
     },
 });

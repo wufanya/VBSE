@@ -105,7 +105,7 @@
         </view>
         <view class="two-grid action-top-grid">
           <input class="field-input tight-input" placeholder="开票人" value="{{drawer}}" data-field="drawer" bindinput="onFieldInput" />
-          <button class="secondary-button" bindtap="goHistory">查看历史</button>
+          <view class="secondary-button history-button" hover-class="tap-hover" bindtap="goHistory">查看历史</view>
         </view>
         <textarea class="field-textarea" placeholder="备注信息" value="{{remark}}" data-field="remark" bindinput="onFieldInput"></textarea>
         <view class="action-grid">
