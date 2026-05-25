@@ -22,7 +22,7 @@ interface HistoryPageData {
   empty: boolean
 }
 
-Page<HistoryPageData>({
+Page<HistoryPageData, WechatMiniprogram.IAnyObject>({
   data: {
     cards: [],
     empty: false,

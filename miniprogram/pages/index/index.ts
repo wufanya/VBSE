@@ -31,6 +31,12 @@ import {
 } from '../../utils/storage'
 import { drawQrMatrix, drawQrToCanvas, makeQrMatrix } from '../../utils/qr'
 
+type CanvasTextAlignValue = 'left' | 'right' | 'center' | 'start' | 'end'
+type Canvas2DContext = WechatMiniprogram.CanvasContext & {
+  textAlign: CanvasTextAlignValue
+  ellipse(x: number, y: number, radiusX: number, radiusY: number, rotation: number, startAngle: number, endAngle: number): void
+}
+
 interface PickerOption {
   label: string
   value: string
@@ -204,7 +210,7 @@ function buildDraftFromRecord(record: InvoiceRecord): InvoiceDraft {
 }
 
 function drawRoundedRect(
-  ctx: WechatMiniprogram.CanvasRenderingContext2D,
+  ctx: Canvas2DContext,
   x: number,
   y: number,
   width: number,
@@ -222,7 +228,7 @@ function drawRoundedRect(
 }
 
 function wrapText(
-  ctx: WechatMiniprogram.CanvasRenderingContext2D,
+  ctx: Canvas2DContext,
   text: string,
   x: number,
   y: number,
@@ -256,7 +262,7 @@ function wrapText(
 }
 
 function drawCellText(
-  ctx: WechatMiniprogram.CanvasRenderingContext2D,
+  ctx: Canvas2DContext,
   text: string,
   x: number,
   y: number,
@@ -285,7 +291,7 @@ function drawCellText(
 }
 
 function fitTextSize(
-  ctx: WechatMiniprogram.CanvasRenderingContext2D,
+  ctx: Canvas2DContext,
   text: string,
   maxWidth: number,
   initialSize: number,
@@ -304,14 +310,14 @@ function fitTextSize(
 }
 
 function drawFittedText(
-  ctx: WechatMiniprogram.CanvasRenderingContext2D,
+  ctx: Canvas2DContext,
   text: string,
   x: number,
   y: number,
   maxWidth: number,
   initialSize: number,
   fontFamily: string,
-  align: CanvasTextAlign = 'left',
+  align: CanvasTextAlignValue = 'left',
   fontWeight = '400',
   minSize = 9
 ): void {
@@ -321,7 +327,7 @@ function drawFittedText(
 }
 
 function drawVerticalLabel(
-  ctx: WechatMiniprogram.CanvasRenderingContext2D,
+  ctx: Canvas2DContext,
   chars: string[],
   x: number,
   y: number,
@@ -339,7 +345,7 @@ function getPosterHeight(lineCount: number): number {
 
 function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord): number {
   const ratio = wx.getSystemInfoSync().pixelRatio || 1
-  const ctx = canvas.getContext('2d') as WechatMiniprogram.CanvasRenderingContext2D
+  const ctx = canvas.getContext('2d') as Canvas2DContext
   const bodyRows = Math.max(invoice.lines.length, 6)
   const exportHeight = getPosterHeight(invoice.lines.length)
   canvas.width = EXPORT_WIDTH * ratio
@@ -529,7 +535,7 @@ function renderPoster(canvas: WechatMiniprogram.Canvas, invoice: InvoiceRecord):
   return exportHeight
 }
 
-Page<InvoicePageData>({
+Page<InvoicePageData, WechatMiniprogram.IAnyObject>({
   data: {
     companyOptionViews: COMPANY_OPTION_VIEWS,
     taxRateOptions: TAX_RATE_OPTION_VIEWS,
@@ -678,7 +684,7 @@ Page<InvoicePageData>({
     this.refreshPreview()
   },
   onDateChange(e: WechatMiniprogram.PickerChange) {
-    this.setData({ invoiceDate: e.detail.value })
+    this.setData({ invoiceDate: e.detail.value as string })
     this.refreshPreview()
   },
   onCompanyChange(e: WechatMiniprogram.PickerChange) {

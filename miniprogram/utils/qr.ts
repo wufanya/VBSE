@@ -1,3 +1,5 @@
+type Canvas2DContext = WechatMiniprogram.CanvasContext
+
 function appendBits(bits: number[], value: number, length: number): void {
   for (let i = length - 1; i >= 0; i -= 1) {
     bits.push((value >>> i) & 1)
@@ -200,7 +202,7 @@ export function makeQrMatrix(text: string): boolean[][] {
 }
 
 export function drawQrMatrix(
-  context: WechatMiniprogram.CanvasRenderingContext2D,
+  context: Canvas2DContext,
   matrix: boolean[][],
   size: number,
   x = 0,
@@ -224,6 +226,6 @@ export function drawQrMatrix(
 }
 
 export function drawQrToCanvas(canvas: WechatMiniprogram.Canvas, text: string, size: number): void {
-  const context = canvas.getContext('2d') as WechatMiniprogram.CanvasRenderingContext2D
+  const context = canvas.getContext('2d') as Canvas2DContext
   drawQrMatrix(context, makeQrMatrix(text || 'VBSE'), size)
 }
