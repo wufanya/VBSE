@@ -3,6 +3,17 @@
 > 本文档记录 VBSE 发票教学工具（Electron 封装网页版）的实际验证结果。
 > 原则：只记录真实执行过的步骤与输出；未执行的项目明确标注“未验证”。
 
+## 交付汇总
+
+| 项 | 内容 |
+| --- | --- |
+| 安装包 | `G:\AAAAAAAAAAAA\fapiao\release\VBSE-发票教学工具-Setup-1.0.0.exe`（约 106.6 MB，Windows x64 NSIS） |
+| 构建命令 | `npm install` → `npm run desktop:pack`（产物目录 `release/`） |
+| 开发运行 | `npm run desktop:dev` |
+| 回归命令 | `npm run verify`（小程序构建 + 小程序单测 + 桌面冒烟） |
+| 数据位置 | `%APPDATA%\VBSE发票教学工具\invoice-store.json`（升级与卸载均保留） |
+| 主要限制 | 安装包未签名（可能触发 SmartScreen）；浏览器旧数据不迁移；打印对话框手选打印机为人工步骤 |
+
 ## 测试环境
 
 | 项 | 值 |
