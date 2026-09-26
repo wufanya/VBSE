@@ -161,6 +161,19 @@ function createWindow() {
 
 // ---- 冒烟测试阶段（仅当设置了 VBSE_SMOKE 时执行） --------------------------
 
+function incrementDigits(value) {
+  const digits = String(value).split('')
+  let carry = 1
+  for (let i = digits.length - 1; i >= 0; i--) {
+    const sum = Number(digits[i]) + carry
+    digits[i] = String(sum % 10)
+    carry = sum > 9 ? 1 : 0
+    if (!carry) break
+  }
+  if (carry) digits.unshift('1')
+  return digits.join('')
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -216,6 +229,55 @@ const WRITE_SCRIPT = `(function () {
   return true;
 })()`
 
+const FLOW_SCRIPT = `(function () {
+  var confirmOriginal = window.confirm;
+  var printOriginal = window.print;
+  var printCalls = 0;
+  window.confirm = function () { return true; };
+  window.print = function () { printCalls++; };
+
+  var beforeNumber = getNextInvoiceNumber();
+  var beforeCount = getHistory().length;
+
+  fillSample();
+  createInvoice();
+
+  var afterCreate = {
+    nextNumber: getNextInvoiceNumber(),
+    count: getHistory().length,
+    savedNumber: (getHistory()[0] || {}).invoiceNumber,
+    previewNumber: (document.getElementById('pInvoiceNumber') || {}).textContent || ''
+  };
+
+  var firstId = (getHistory()[0] || {}).id;
+  loadHistory(firstId);
+  var afterLoad = {
+    invoiceNumber: document.getElementById('invoiceNumber').value,
+    buyerName: document.getElementById('buyerName').value,
+    sellerName: document.getElementById('sellerName').value,
+    buyerSelect: document.getElementById('buyerCompany').value,
+    guideText: (document.getElementById('toast') || {}).textContent || ''
+  };
+
+  printHistory(firstId);
+  var printInvoked = printCalls;
+
+  clearHistory();
+  var afterClear = { count: getHistory().length };
+
+  window.confirm = confirmOriginal;
+  window.print = printOriginal;
+
+  return {
+    beforeNumber: beforeNumber,
+    beforeCount: beforeCount,
+    afterCreate: afterCreate,
+    afterLoad: afterLoad,
+    printCalls: printInvoked,
+    afterClear: afterClear
+  };
+})()`
+
 async function runSmoke(phase, contents) {
   const result = { phase, ok: false }
 
@@ -242,6 +304,21 @@ async function runSmoke(phase, contents) {
     result.ok = result.state.next === '26412000001304072777' &&
       result.state.count >= 1 &&
       result.state.first === '26412000001304072777'
+  } else if (phase === 'flow') {
+    const state = await contents.executeJavaScript(FLOW_SCRIPT, true)
+    await sleep(500)
+    result.state = state
+    const storeAfter = JSON.parse(fs.readFileSync(storeFile(), 'utf8'))
+    result.storeHistoryCount = JSON.parse(storeAfter.values.vbseInvoiceHistory || '[]').length
+    result.ok = state.afterCreate.count === state.beforeCount + 1 &&
+      state.afterCreate.nextNumber === incrementDigits(state.beforeNumber) &&
+      state.afterCreate.savedNumber === state.afterCreate.previewNumber &&
+      state.afterLoad.buyerName.length > 0 &&
+      state.afterLoad.sellerName.length > 0 &&
+      state.afterLoad.buyerSelect !== '__manual__' &&
+      state.printCalls >= 1 &&
+      state.afterClear.count === 0 &&
+      result.storeHistoryCount === 0
   } else if (phase === 'print') {
     await runPrintSmoke(result, contents)
   } else if (phase === 'dialog') {

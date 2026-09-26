@@ -89,7 +89,13 @@ test('desktop app smoke: launch, storage bridge, offline page', async () => {
     const readBack = findResult(read.results, 'read')
     assert.equal(readBack.ok, true, `read 失败: ${JSON.stringify(readBack)}`)
 
-    // 4) 打印能力：打印机列表 + PDF 渲染 + 打印媒体截图
+    // 4) 完整业务流：生成（号码自增）→ 历史回填 → 打印历史 → 清空历史
+    const flow = await runPhase('flow', userDataDir)
+    const flowResult = findResult(flow.results, 'flow')
+    assert.equal(flowResult.ok, true, `flow 失败: ${JSON.stringify(flowResult)}`)
+    console.log('[smoke] flow =', JSON.stringify(flowResult.state))
+
+    // 5) 打印能力：打印机列表 + PDF 渲染 + 打印媒体截图
     const print = await runPhase('print', userDataDir)
     const printed = findResult(print.results, 'print')
     assert.equal(printed.ok, true, `print 失败: ${JSON.stringify(printed)}`)

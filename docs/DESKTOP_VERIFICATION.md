@@ -25,13 +25,14 @@ npm run verify             # 小程序构建 + 7 个原有单测 + 桌面冒烟
 
 结果：`npm run verify` 全部通过（build:mp 成功；原有测试 7/7 pass；桌面冒烟 1/1 pass，耗时约 4.3s）。
 
-冒烟覆盖内容（`tests/run-desktop-smoke.ts` 驱动 `desktop/main.cjs` 的 4 个阶段）：
+冒烟覆盖内容（`tests/run-desktop-smoke.ts` 驱动 `desktop/main.cjs` 的 5 个阶段）：
 
 | 阶段 | 验证点 | 结果 |
 | --- | --- | --- |
 | basic | 页面加载、`window.vbseStorage` 桥存在、企业下拉 24 项（23 家 + 手动输入）、二维码 canvas 像素非空、教学标注文案在页面上、桌面版未写入 localStorage、发票预览无横向溢出 | ✅ |
 | write | 写入下一发票号 `26412000001304072777` 与 1 条历史，`invoice-store.json` 落盘 | ✅ |
 | read | **关闭进程后重新启动**，历史与下一号码完整回读 | ✅ |
+| flow | 完整业务流：生成发票（号码自增 `…777` → `…778`）、历史 +1、保存号码与票面一致、`loadHistory` 回填购方/销方名称与税号（下拉回到企业预设索引 7，而非“手动输入”）、打印历史触发 `window.print()` 1 次、清空历史后内存与落盘均为 0 条 | ✅ |
 | print | 打印机列表、printToPDF、打印媒体仿真截图 | ✅ |
 
 ### 打印能力（已验证）
@@ -53,7 +54,7 @@ npm run verify             # 小程序构建 + 7 个原有单测 + 桌面冒烟
 
 | 项 | 结果 |
 | --- | --- |
-| 安装包 | `G:\AAAAAAAAAAAA\fapiao\release\VBSE-发票教学工具-Setup-1.0.0.exe`（111,713,228 字节，Windows x64 NSIS） |
+| 安装包 | `G:\AAAAAAAAAAAA\fapiao\release\VBSE-发票教学工具-Setup-1.0.0.exe`（111,796,678 字节，Windows x64 NSIS） |
 | 测试日期 | 2026-09-26 |
 | 静默安装（`/S`） | ✅ exit=0；安装至 `%LOCALAPPDATA%\Programs\vbse-invoice-miniprogram\`，生成 `VBSE发票教学工具.exe` |
 | 快捷方式 | ✅ 开始菜单与桌面均生成 `VBSE发票教学工具.lnk` |
@@ -77,7 +78,27 @@ npm run verify             # 小程序构建 + 7 个原有单测 + 桌面冒烟
 | 网页版（浏览器打开 HTML） | 该浏览器的 `localStorage`（键 `vbseInvoiceHistory`、`vbseInvoiceNextNumber`） |
 | 迁移 | **不支持自动迁移**。浏览器中的旧数据不会进入桌面版，需手工导出/录入。 |
 
-## 四、已知限制
+## 五、测试命令与工件
+
+| 命令 | 用途 | 结果 |
+| --- | --- | --- |
+| `npm run build:mp` | 小程序 TS/SCSS 构建 | ✅ 成功 |
+| `npm test` | 小程序单元测试 | ✅ 7/7 pass |
+| `npm run desktop:smoke` | 桌面冒烟（5 阶段） | ✅ 1/1 pass（约 4.8s） |
+| `npm run verify` | 上述三项串联 | ✅ 全部通过 |
+| `npm run desktop:pack` | NSIS 安装包 | ✅ `release/VBSE-发票教学工具-Setup-1.0.0.exe` |
+
+冒烟产生的工件（位于临时目录，不提交）：
+
+- `%TEMP%\vbse-smoke-print.pdf`：打印管线输出的 A4 横向 PDF（约 425 KB）
+- `%TEMP%\vbse-smoke-print-media.png`：打印媒体仿真截图（版式核对用）
+
+安装验收产生的截图：`screenshots/installed-app.png`、`screenshots/installed-app-2.png`（该目录已被 `.gitignore` 忽略）。
+
+### 打包环境注意事项
+
+- `electron-builder` 默认需要联网下载 Electron 运行时与 NSIS 工具链；本次打包中出现过 `read ECONNRESET`（网络抖动）导致失败。
+  为提高可重复性，`package.json` 的 `build.electronDist` 已指向本地已解压运行时 `node_modules/electron/dist`，打包不再依赖下载 Electron 二进制（NSIS 工具链仍走 `%LOCALAPPDATA%\electron-builder\Cache` 缓存）。
 
 - 打印对话框中选择 “Microsoft Print to PDF” 并保存的**图形交互**未自动化验证（打印管线、PDF 输出、打印机枚举已自动化验证）。
 - 安装包未签名：SmartScreen 表现因机器信誉而异。

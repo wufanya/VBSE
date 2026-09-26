@@ -49,6 +49,7 @@
       "package.json"
     ],
     "asar": true,
+    "electronDist": "node_modules/electron/dist",
     "win": {
       "icon": "desktop/assets/icon.ico",
       "target": [
