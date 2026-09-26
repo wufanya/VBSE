@@ -16,3 +16,8 @@ node_modules/
 # Local debug artifacts
 debug.log
 screenshots/
+
+# Desktop build output
+release/
+*.log
+

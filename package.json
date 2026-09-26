@@ -1,11 +1,17 @@
 {
   "name": "vbse-invoice-miniprogram",
   "version": "1.0.0",
-  "description": "VBSE 发票教学微信小程序",
+  "description": "VBSE 发票教学微信小程序与 Windows 桌面安装版",
+  "main": "desktop/main.cjs",
   "scripts": {
     "build:mp": "node tools/build-miniprogram.mjs",
     "test": "node --experimental-strip-types tests/run-tests.ts",
-    "verify": "npm run build:mp && npm test"
+    "verify": "npm run build:mp && npm test && npm run test:desktop",
+    "desktop:dev": "electron desktop/main.cjs",
+    "desktop:smoke": "node --experimental-strip-types tests/run-desktop-smoke.ts",
+    "test:desktop": "npm run desktop:smoke",
+    "desktop:pack": "electron-builder --win nsis --x64",
+    "icons": "node tools/generate-temp-icon.mjs"
   },
   "keywords": [
     "wechat-miniprogram",
@@ -22,8 +28,48 @@
     "url": "https://github.com/wufanya/VBSE.git"
   },
   "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "miniprogram-api-typings": "^2.8.3-1",
     "sass": "^1.99.0",
     "typescript": "^6.0.3"
+  },
+  "build": {
+    "appId": "com.vbse.invoice.teaching",
+    "productName": "VBSE发票教学工具",
+    "artifactName": "VBSE-发票教学工具-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "desktop/assets"
+    },
+    "files": [
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "VBSE发票小程序（2.2版).html",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "desktop/assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VBSE发票教学工具",
+      "uninstallDisplayName": "VBSE发票教学工具",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "desktop/assets/icon.ico",
+      "uninstallerIcon": "desktop/assets/icon.ico",
+      "language": "1033"
+    }
   }
 }

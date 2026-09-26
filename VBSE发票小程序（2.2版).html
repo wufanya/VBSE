@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <title>VBSE 电子发票小程序</title>
 <style>
 :root {
@@ -49,6 +50,25 @@ body {
     margin: 0;
     font-size: 24px;
     line-height: 1.25;
+}
+
+.topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.teaching-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border: 2px solid #b42318;
+    border-radius: 6px;
+    color: #b42318;
+    background: #fff5f4;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
 }
 
 .layout {
@@ -774,8 +794,9 @@ button.danger { color: var(--danger); background: #fff1f0; }
 <body>
 <main class="app">
     <header class="topbar">
-        <div>
+        <div class="topbar-brand">
             <h1 class="title">VBSE 实训 · 电子发票小程序</h1>
+            <span class="teaching-badge">教学样票，不作为真实开票或报销凭证</span>
         </div>
         <div class="actions">
             <button class="print" type="button" onclick="printInvoice()">打印/导出 PDF</button>
@@ -945,7 +966,7 @@ button.danger { color: var(--danger); background: #fff1f0; }
                 <div class="footer">
                     <span>开票人：<span id="pDrawer"></span></span>
                     <span>复核：</span>
-                    <span>实训票据，仅供教学使用</span>
+                    <span>教学样票，不作为真实开票或报销凭证</span>
                 </div>
             </article>
             </div>
@@ -968,6 +989,16 @@ const DEFAULT_INVOICE_NUMBER = "26412000001304072701";
 const MANUAL_COMPANY = "__manual__";
 const MANUAL_TAX_RATE = "manual";
 let currentInvoiceData = null;
+
+// 存储适配层：桌面版（Electron）通过预加载脚本暴露 vbseStorage（userData JSON 文件），
+// 网页版回退到 localStorage。两者 API 形状一致（getItem/setItem/removeItem）。
+const storage = (typeof window !== "undefined" && window.vbseStorage)
+    ? window.vbseStorage
+    : {
+        getItem(key) { return localStorage.getItem(key); },
+        setItem(key, value) { localStorage.setItem(key, value); },
+        removeItem(key) { localStorage.removeItem(key); }
+    };
 
 const COMPANY_OPTIONS = [
     {"name":"宝乐童车制造有限公司","taxId":"110108809018632001"},
@@ -1050,11 +1081,11 @@ function syncCompanySelect(role, name, taxId) {
 }
 
 function getNextInvoiceNumber() {
-    return localStorage.getItem(STORAGE_NEXT_NUMBER) || DEFAULT_INVOICE_NUMBER;
+    return storage.getItem(STORAGE_NEXT_NUMBER) || DEFAULT_INVOICE_NUMBER;
 }
 
 function setNextInvoiceNumber(value) {
-    localStorage.setItem(STORAGE_NEXT_NUMBER, value.toString());
+    storage.setItem(STORAGE_NEXT_NUMBER, value.toString());
 }
 
 function incrementInvoiceNumber(value) {
@@ -1400,12 +1431,12 @@ function createInvoice() {
 function saveHistory(data) {
     const history = getHistory();
     history.unshift(data);
-    localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history.slice(0, 100)));
+    storage.setItem(STORAGE_HISTORY, JSON.stringify(history.slice(0, 100)));
 }
 
 function getHistory() {
     try {
-        return JSON.parse(localStorage.getItem(STORAGE_HISTORY) || "[]");
+        return JSON.parse(storage.getItem(STORAGE_HISTORY) || "[]");
     } catch (error) {
         return [];
     }
@@ -1475,7 +1506,7 @@ function printHistory(id) {
 
 function clearHistory() {
     if (!confirm("确定清空本浏览器里的全部历史记录吗？")) return;
-    localStorage.removeItem(STORAGE_HISTORY);
+    storage.removeItem(STORAGE_HISTORY);
     renderHistory();
     showToast("历史记录已清空");
 }
