@@ -111,6 +111,8 @@ npm run verify             # 小程序构建 + 7 个原有单测 + 桌面冒烟
 - `electron-builder` 默认需要联网下载 Electron 运行时与 NSIS 工具链；本次打包中出现过 `read ECONNRESET`（网络抖动）导致失败。
   为提高可重复性，`package.json` 的 `build.electronDist` 已指向本地已解压运行时 `node_modules/electron/dist`，打包不再依赖下载 Electron 二进制（NSIS 工具链仍走 `%LOCALAPPDATA%\electron-builder\Cache` 缓存）。
 
+## 六、已知限制
+
 - 打印对话框中选择 “Microsoft Print to PDF” 并保存的**图形交互**未自动化验证（打印管线、PDF 输出、打印机枚举已自动化验证）。
 - 安装包未签名：SmartScreen 表现因机器信誉而异。
 - 未做“干净虚拟机”级别的隔离安装测试；本次在开发机（Windows 11 家庭中文版 10.0.26200.0）执行，安装前该应用未安装过。

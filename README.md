@@ -89,7 +89,7 @@ release/VBSE-发票教学工具-Setup-<版本>.exe   # 安装程序（Windows x6
 
 - 页面同时服务网页版与桌面版；桌面版通过预加载脚本暴露 `vbseStorage`，网页版自动回退 `localStorage`。
 - 打印使用系统打印对话框（`window.print()`），可选择系统打印机或“Microsoft Print to PDF”另存 PDF；这是**打印教学样票**，不是真实电子发票开具。
-- 验证记录与已知限制见 `docs/DESKTOP_VERIFICATION.md`。
+- 验证记录与已知限制见 `docs/DESKTOP_VERIFICATION.md`；后续开发者请先读 `docs/DESKTOP_NEXT_HANDOFF.md`（现状、架构、数据契约、待办与踩坑记录）。
 
 ## 项目结构
 
