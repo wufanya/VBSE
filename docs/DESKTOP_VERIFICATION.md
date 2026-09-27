@@ -259,3 +259,13 @@ dxcompiler/dxil（WebGPU 专用，27.2MB 解压，需 GPU 回退场景回归验�
 | 回归 | `npm test` 7/7（直接测生成产物=核心）；`test:web-regression` 1/1（golden 0.0000% 差异）；`desktop:smoke` 3/3；`npm run verify` 全链绿 |
 
 未覆盖/待裁决（阻塞完全统一的三项，均为产品决策而非工程问题）：#1 符号、#2 示例名、#3 舍入语义。裁决后各项均为一处小改动（删适配 replace / 改核心数据 / 统一管线），护栏会自动验证统一后的行为。
+
+### §十三 补遗：漂移 #3 已裁决（2026-09-27）
+
+用户裁决：**每行先按分舍入再汇总**（与核心/小程序口径一致）。落实：
+- `shared/invoice-core.ts` 导出 `roundMoney`（原私有函数加导出，逻辑未变）；
+- 网页版 `readLineItems`/`updateLineTotals` 改用 `VBSECore.roundMoney(qty×price)`、`roundMoney(金额×税率)`——行内预览、票面、导出 JSON、历史写入从此与小程序同口径；
+- 历史**旧记录不迁移不重算**（存储金额原样展示，兼容）；
+- 回归：样本票展示逐像素不变（golden 0.0000%）、单测 7/7、verify 全链绿。
+
+漂移状态更新：#3 已解决；#1（￥/¥ 显示约定）维持适配层方案；#2（宣传单/宣传册）仍待产品裁决。

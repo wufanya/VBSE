@@ -396,6 +396,8 @@ export function normalizeHistoryRecord(item: Partial<InvoiceRecord>): InvoiceRec
   })
 }
 
-function roundMoney(value: number): number {
+// 舍入口径（漂移 #3 已裁决 2026-09-27）：每行先按分舍入再汇总——行金额=round(qty×price)、
+// 行税额=round(金额×税率)，合计为舍入后行值之和。网页版已同样采用本口径。
+export function roundMoney(value: number): number {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100
 }
