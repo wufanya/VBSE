@@ -389,12 +389,15 @@ const IO_SCRIPT = `(function () {
       });
       return window.vbseIO.importInvoice().then(function (imp) {
         if (!imp || !imp.ok) return { exportOk: true, importOk: false, importError: imp && imp.error };
-        var normalized = normalizeHistoryItem(JSON.parse(imp.json));
+        var parsed = JSON.parse(imp.json);
+        var validationProblem = validateImportedInvoice(parsed);
+        var normalized = normalizeHistoryItem(parsed);
         fillForm(normalized);
         renderInvoice(normalized);
         return {
           exportOk: true,
           importOk: true,
+          validationProblem: validationProblem,
           importedJson: imp.json,
           importedNumber: document.getElementById('invoiceNumber').value,
           importedBuyer: document.getElementById('buyerName').value,
@@ -419,7 +422,9 @@ const BADIO_SCRIPT = `(async function () {
       invoiceNumber: '26412000001304079999', invoiceDate: '2026-09-27',
       buyerName: '校验购方', buyerTax: '000000000000000000',
       sellerName: '校验销方', sellerTax: '111111111111111111',
-      drawer: '测试', remark: '', lines: [Object.assign({}, goodLine)]
+      drawer: '测试', remark: '',
+      totalAmount: 7, totalTax: 0.91, grandTotal: 7.91,
+      lines: [Object.assign({}, goodLine)]
     };
     if (overrides) overrides(rec);
     return rec;
@@ -436,7 +441,11 @@ const BADIO_SCRIPT = `(async function () {
     { title: 'Infinity price', rec: recordWith(function (r) { r.lines[0].price = Infinity; }), valid: false },
     { title: 'missing amount', rec: recordWith(function (r) { delete r.lines[0].amount; }), valid: false },
     { title: 'too many lines', rec: recordWith(function (r) { r.lines = []; for (var i = 0; i < 201; i++) r.lines.push(Object.assign({}, goodLine)); }), valid: false },
-    { title: 'json 1e999 -> Infinity', rec: JSON.parse('{"invoiceNumber":"N","invoiceDate":"2026-09-27","buyerName":"a","buyerTax":"b","sellerName":"c","sellerTax":"d","lines":[{"name":"x","unit":"项","qty":1e999,"price":1,"taxRate":0.13,"amount":1,"taxAmount":0.13}]}'), valid: false },
+    { title: 'totals mismatch', rec: recordWith(function (r) { r.totalAmount = 9999; }), valid: false },
+    { title: 'line amount mismatch', rec: recordWith(function (r) { r.lines[0].amount = 999; r.totalAmount = 999; r.grandTotal = 999.91; }), valid: false },
+    { title: 'line taxAmount inconsistent with rate', rec: recordWith(function (r) { r.lines[0].taxAmount = 1; r.totalTax = 1; r.grandTotal = 8; }), valid: false },
+    { title: 'washed numbers trap (normalize-first would accept)', rec: recordWith(function (r) { r.lines[0].price = '5e999'; r.lines[0].amount = '5e999'; r.lines[0].taxAmount = '5e999'; r.totalAmount = '5e999'; r.totalTax = '5e999'; r.grandTotal = '5e999'; }), valid: false },
+    { title: 'json 1e999 -> Infinity', rec: JSON.parse('{"invoiceNumber":"N","invoiceDate":"2026-09-27","buyerName":"a","buyerTax":"b","sellerName":"c","sellerTax":"d","totalAmount":0,"totalTax":0,"grandTotal":0,"lines":[{"name":"x","unit":"项","qty":1e999,"price":1,"taxRate":0.13,"amount":1,"taxAmount":0.13}]}'), valid: false },
     { title: 'valid record', rec: recordWith(null), valid: true }
   ];
   var results = cases.map(function (c) {
@@ -496,6 +505,7 @@ async function runSmoke(phase, contents) {
     result.exportFile = process.env.VBSE_SMOKE_EXPORT_FILE || ''
     result.ok = state.exportOk === true &&
       state.importOk === true &&
+      state.validationProblem === "" &&
       !!result.exportFile &&
       fs.existsSync(result.exportFile)
   } else if (phase === 'badio') {

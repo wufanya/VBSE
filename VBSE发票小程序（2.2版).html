@@ -1711,9 +1711,28 @@ function validateImportedInvoice(record) {
         if (!Number.isFinite(line.amount) || line.amount < 0 || line.amount > 1e12) return `第 ${i + 1} 行金额必须是 0 到 1 万亿之间的有限数字`;
         if (!Number.isFinite(line.taxAmount) || line.taxAmount < 0 || line.taxAmount > 1e12) return `第 ${i + 1} 行税额必须是 0 到 1 万亿之间的有限数字`;
     }
+    // 业务一致性：字段各自合法还不够，金额必须与数量×单价、税额与金额×税率、汇总与明细和互相自洽。
+    // 比较复用 formatMoney 的分位舍入语义（与票面展示同一套规则），不引入第三套金额算法；
+    // 本工具导出的文件按构造自洽，必然通过。汇总三字段由导出方固定携带，故必填。
+    for (const key of ["totalAmount", "totalTax", "grandTotal"]) {
+        if (!Number.isFinite(record[key]) || record[key] < 0) return `缺少${key === "totalAmount" ? "合计金额" : key === "totalTax" ? "税额合计" : "价税合计"}或数值不合法`;
+    }
+    const totalAmount = record.lines.reduce((sum, line) => sum + line.amount, 0);
+    const totalTax = record.lines.reduce((sum, line) => sum + line.taxAmount, 0);
+    if (formatMoney(record.totalAmount) !== formatMoney(totalAmount)) return "合计金额与明细汇总不一致";
+    if (formatMoney(record.totalTax) !== formatMoney(totalTax)) return "税额合计与明细汇总不一致";
+    if (formatMoney(record.grandTotal) !== formatMoney(record.totalAmount + record.totalTax)) return "价税合计与合计、税额之和不一致";
+    for (let i = 0; i < record.lines.length; i++) {
+        const line = record.lines[i];
+        if (formatMoney(line.amount) !== formatMoney(line.qty * line.price)) return `第 ${i + 1} 行金额与数量×单价不一致`;
+        if (formatMoney(line.taxAmount) !== formatMoney(line.amount * line.taxRate)) return `第 ${i + 1} 行税额与金额×税率不一致`;
+    }
     return "";
 }
 
+// 顺序契约（不得调整）：JSON.parse → validateImportedInvoice(原始对象) → normalizeHistoryItem → 应用。
+// 校验必须发生在 normalize 之前：normalizeHistoryItem 的 finiteOrZero 是历史数据容错路径，
+// 会把非法值洗成 0——若先 normalize 再校验，等于拆掉导入的严格边界。
 function importInvoice() {
     if (!window.vbseIO) {
         showToast("网页版暂不支持导入，请使用桌面版");

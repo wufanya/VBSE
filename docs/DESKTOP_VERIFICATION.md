@@ -205,3 +205,13 @@ dxcompiler/dxil（WebGPU 专用，27.2MB 解压，需 GPU 回退场景回归验�
 | 回归 | `npm test` 7/7；`npm run desktop:smoke` 2/2 全绿（含全部既有阶段） |
 
 如实声明：非法导入的"主进程拒绝超大文件"由环境变量路径覆盖；页面级校验矩阵通过直调 `validateImportedInvoice` 覆盖（导入对话框交互仍无法自动化）；`quarantine` 隔离产物命名为 `invoice-store.corrupt-<时间戳>.json`（既有行为，测试已按此断言）。
+
+### §十一 补遗：业务一致性校验与顺序契约（2026-09-27 第二轮，评审意见落实）
+
+| 项 | 结果 |
+| --- | --- |
+| 顺序契约 | `importInvoice` 固定为 `JSON.parse → validateImportedInvoice(原始对象) → normalizeHistoryItem → 应用`，已写入代码注释；normalize 的 finiteOrZero 定位为历史数据读取容错，不得前置于导入校验（否则非法值被洗成 0 绕过边界） |
+| 业务一致性 | 校验器新增：明细 `amount == formatMoney(qty×price)`、`taxAmount == formatMoney(amount×taxRate)`、`totalAmount/totalTax == 明细和`、`grandTotal == totalAmount+totalTax`；比较复用 formatMoney 分位舍入语义（与票面展示同一套规则），未引入第三套金额算法；汇总三字段必填（导出方固定携带） |
+| 冒烟 | 矩阵扩至 17 用例：新增 totals 不一致、行金额不一致、行税额与税率不一致、**洗白陷阱**（price/amount/taxAmount/汇总全部传 `5e999` 字符串——若顺序错为先 normalize 后校验会全被洗成 0 而放行，现被整体拒绝） |
+| io 往返 | 导出→导入回放现在同时断言 `validateImportedInvoice(导出内容) === ""`（导出文件必须能通过自己的校验器） |
+| 回归 | `node --check` ✓；`npm test` 7/7；`npm run desktop:smoke` 2/2 全绿 |
