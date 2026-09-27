@@ -2,7 +2,7 @@
 
 > 交接时间：2026-09-26 ｜ 仓库：`G:\AAAAAAAAAAAA\fapiao`（master）
 > 相关提交：`ea159af`（桌面版主体）→ `fc37fa2`（业务流冒烟 + 本地运行时打包）→ `ad60d78`（交付汇总文档）
-> 原始任务书：`docs/WINDOWS_EXE_HANDOFF.md`；实测记录：`docs/DESKTOP_VERIFICATION.md`；用户文档：`README.md`
+> 原始任务书：`docs/archive/WINDOWS_EXE_HANDOFF.md（已归档：桌面版已完成，原始任务书仅供历史追溯）`；实测记录：`docs/DESKTOP_VERIFICATION.md`；用户文档：`README.md`
 > 阅读建议：先看 §0–§2 上手，动手前看 §4、§5、§9，遇到怪问题直接查 §7。
 
 ## 0. 一句话现状
@@ -107,7 +107,7 @@ npm run desktop:pack        # 期望：release/VBSE-发票教学工具-Setup-1.0
 ### 3.4 文档
 
 `README.md`（用户向）、`docs/DESKTOP_VERIFICATION.md`（验证记录）、`docs/DEVELOPMENT.md`（小程序开发）、
-`docs/WINDOWS_EXE_HANDOFF.md`（原始任务书）、`docs/DESKTOP_NEXT_HANDOFF.md`（本文件）。
+`docs/archive/WINDOWS_EXE_HANDOFF.md（已归档：桌面版已完成，原始任务书仅供历史追溯）`（原始任务书）、`docs/DESKTOP_NEXT_HANDOFF.md`（本文件）。
 
 ## 4. 架构与设计决策（改代码前先读，避免走回头路）
 

@@ -29,3 +29,6 @@ diagram/
 
 # 本地打包/分享压缩包不入库
 *.rar
+
+# 微信开发者工具私有配置（每机器各自生成）
+project.private.config.json

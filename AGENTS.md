@@ -47,6 +47,8 @@ npm run desktop:pack        # NSIS 安装包 → release/（改 HTML/main.cjs �
 - 三项双端历史漂移：#3 舍入语义已统一为"每行先按分舍入再汇总"（roundMoney 已导出）；
   #1 ￥/¥ 货币符号、#2 "宣传单/宣传册"示例名由适配层保持两级行为待裁决——勿顺手统一，
   裁决后各删一行适配即可（见验证记录 §十三）。
+- **工程治理已冻结**（2026-09-27）：护栏/核心统一/仓库卫生均已收官；后续只按真实教学
+  反馈、bug 或明确产品需求迭代。
 
 ## 测试与验收
 
@@ -58,6 +60,7 @@ npm run desktop:pack        # NSIS 安装包 → release/（改 HTML/main.cjs �
 
 ## 必读文档
 
+- `docs/README.md` — 文档导航入口（每份文档一句话定位，先看这个）。
 - `docs/DESKTOP_NEXT_HANDOFF.md` — 最全交接：§9 硬性约束、§8 待办与优先级、§11 回滚。
 - `docs/DESKTOP_VERIFICATION.md` — 历轮验证记录（§一~§十三），含所有"未验证项"的如实清单。
 - `docs/RELEASE.md` — 发版流程（tag v* → 冒烟硬门禁 → NSIS → draft Release）。
