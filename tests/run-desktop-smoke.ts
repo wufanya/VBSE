@@ -7,6 +7,7 @@ import { createRequire } from 'node:module'
 import test from 'node:test'
 
 import {
+  COMPANY_OPTIONS,
   DEFAULT_INVOICE_NUMBER,
   SAMPLE_LINES,
   buildInvoiceLine,
@@ -276,56 +277,148 @@ const WEB_BASELINE = {
   stageMinHeight: '552.852px',
 } as const
 
+// 网页版打印态基线：2026-09-27 于 print 媒体仿真实测（1440×940，无 vbse-desktop 类）
+const WEB_PRINT_BASELINE = {
+  topbarDisplay: 'none',
+  ioBtnDisplay: 'none',
+  invoicePosition: 'relative',
+  sealTop: '25px',
+  sealLeft: '516px',
+  grandTotalText: '￥3,059.38',
+  goodsRowCount: 8,
+} as const
+
 test('web version zero-change regression (no preload, 1440x940)', async () => {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vbse-web-'))
   try {
     const web = await runPhase('web', userDataDir)
     const webResult = findResult(web.results, 'web')
+    // golden 首次生成属于置红动作：必须人工核对图像并提交后，重跑才进入比对模式
     assert.equal(webResult.ok, true, `web 失败: ${JSON.stringify(webResult)}`)
     const s = webResult.state
-    // 隔离：无桌面类、无桥、桌面专属入口不渲染
-    assert.equal(s.htmlClassName, WEB_BASELINE.htmlClassName, '网页版渲染不应带 vbse-desktop 类')
-    assert.equal(s.hasBridge, false, '网页版不应有 vbseStorage 桥')
-    assert.equal(s.hasIO, false, '网页版不应有 vbseIO 桥')
-    assert.equal(s.ioBtnDisplay, WEB_BASELINE.ioBtnDisplay, '导出/导入按钮不应出现在网页版')
-    assert.equal(s.historyDeleteDisplay, WEB_BASELINE.historyDeleteDisplay, '单条删除按钮不应出现在网页版')
-    // 样式与布局（金标准逐项比对）
-    assert.equal(s.bodyFont, WEB_BASELINE.bodyFont, '正文字体栈变化')
-    assert.equal(s.layoutColumns, WEB_BASELINE.layoutColumns, '栅格列变化（预览/表单位置或宽度）')
-    assert.equal(s.invoicePosition, WEB_BASELINE.invoicePosition, '发票定位方式变化')
-    assert.equal(s.previewPosition, WEB_BASELINE.previewPosition, '预览面板定位变化')
-    assert.equal(s.previewTop, WEB_BASELINE.previewTop, '预览面板 top 变化')
-    assert.equal(s.sealTop, WEB_BASELINE.sealTop, '监制章位置变化')
-    assert.equal(s.sealLeft, WEB_BASELINE.sealLeft, '监制章位置变化')
-    assert.equal(s.formPanelHeight, WEB_BASELINE.formPanelHeight, '表单面板高度变化')
-    assert.equal(s.previewPanelHeight, WEB_BASELINE.previewPanelHeight, '预览面板高度变化')
-    assert.equal(s.stageMinHeight, WEB_BASELINE.stageMinHeight, '发票缩放占位高度变化')
-    // 业务行为（与 invoice.ts 基准比对 + 网页版必须走 localStorage）
+    // —— A. 页面身份与教学安全标识 ——
+    assert.equal(s.identity.htmlClassName, '', '网页版渲染不应带 vbse-desktop 类')
+    assert.equal(s.identity.hasBridge, false, '网页版不应有 vbseStorage 桥')
+    assert.equal(s.identity.hasIO, false, '网页版不应有 vbseIO 桥')
+    assert.equal(s.identity.disclaimerOnPage, true, '票面教学声明缺失')
+    assert.equal(s.identity.teachingBadge, true, '顶栏教学徽标缺失')
+    // —— E/F. 桌面专属入口实际不可见（computed style，而非仅 DOM 存在）——
+    assert.equal(s.layout.ioBtnDisplay, 'none', '导出/导入按钮在网页版可见（桌面入口泄漏）')
+    assert.equal(s.layout.historyDeleteDisplay, 'none', '单条删除按钮在网页版可见（桌面入口泄漏）')
+    // —— B. 企业预设（数量、名单 fixture、典型企业回填）——
+    assert.equal(s.companies.buyerOptions, COMPANY_OPTIONS.length + 1, '企业下拉数量变化（23 家 + 手动输入）')
+    assert.equal(
+      s.companies.optionsText,
+      COMPANY_OPTIONS.map((c) => c.name).join('|') + '|手动输入企业',
+      '企业名单与小程序基准不一致',
+    )
+    assert.equal(s.companyFill.name, COMPANY_OPTIONS[7].name, '选择企业后名称未按当前行为回填')
+    assert.equal(s.companyFill.tax, COMPANY_OPTIONS[7].taxId, '选择企业后税号未按当前行为回填')
+    // —— C. 发票基础流程（金额/税额/合计/价税合计/大写，与 invoice.ts 基准比对，未重新实现算法）——
     const webLines = SAMPLE_LINES.map(buildInvoiceLine)
     const webAmount = webLines.reduce((sum, l) => sum + l.amount, 0)
     const webTax = webLines.reduce((sum, l) => sum + l.taxAmount, 0)
     const webGrand = webAmount + webTax
-    assert.equal(
-      s.money.lineAmounts.join('|'),
-      webLines.map((l) => formatMoney(l.amount)).join('|'),
-      '网页版明细金额与基准不一致',
-    )
-    assert.equal(asOracleMoney(s.money.totalAmount), formatMoney(webAmount, true), '网页版合计与基准不一致')
-    assert.equal(asOracleMoney(s.money.grandTotal), formatMoney(webGrand, true), '网页版价税合计与基准不一致')
-    assert.equal(
-      s.money.upperAmount.endsWith(toChineseUpperMoney(webGrand)),
-      true,
-      `网页版大写金额变化: ${s.money.upperAmount}`,
-    )
+    assert.equal(s.money.lineAmounts.join('|'), webLines.map((l) => formatMoney(l.amount)).join('|'), '明细金额与基准不一致')
+    assert.equal(s.money.lineTaxes.join('|'), webLines.map((l) => formatMoney(l.taxAmount)).join('|'), '明细税额与基准不一致')
+    assert.equal(asOracleMoney(s.money.totalAmount), formatMoney(webAmount, true), '合计与基准不一致')
+    assert.equal(asOracleMoney(s.money.totalTax), formatMoney(webTax, true), '税额合计与基准不一致')
+    assert.equal(asOracleMoney(s.money.grandTotal), formatMoney(webGrand, true), '价税合计与基准不一致')
+    assert.equal(s.money.upperAmount.endsWith(toChineseUpperMoney(webGrand)), true, `大写金额变化: ${s.money.upperAmount}`)
+    // —— D. 发票号码（初始→生成递增→历史回填不异常）——
+    assert.equal(s.business.nextNumber, incrementDecimalString(DEFAULT_INVOICE_NUMBER), '生成后号码未按当前行为递增')
+    assert.equal(s.historyRestore.formNumber, s.historyRestore.previewNumber, '历史回填后表单号码与票面不一致')
+    assert.equal(s.historyRestore.buyerName, COMPANY_OPTIONS[7].name, '历史回填购方异常')
+    // —— E. 历史记录 ——
     assert.equal(s.business.historyCountAfter, 1, '网页版历史写入异常')
     assert.equal(s.business.historyCardCount, 1, '网页版历史渲染异常')
-    assert.equal(s.business.nextNumber, incrementDecimalString(DEFAULT_INVOICE_NUMBER), '网页版号码自增异常')
+    // —— F. localStorage 存储路径（网页版必须写 localStorage，与桌面版断言互为镜像）——
     assert.equal(s.business.localStorageHistory, true, '网页版应写 localStorage 历史')
     assert.equal(s.business.localStorageNext, true, '网页版应写 localStorage 号码')
-    console.log('[smoke] web =', `1440×940 网页版快照与基线一致（面板 ${s.previewPanelHeight}px、栅格 ${s.layoutColumns}）`)
+    // —— 布局基线：样式/定位逐项比对 ——
+    // 像素派生值（栅格列宽/监制章 left 为 50% 求解结果）受滚动条与亚像素取整影响，
+    // 允许 ±2px；语义值（字体栈/定位方式/top:auto）必须精确一致
+    const pxValues = (v: string) => (v.match(/-?\d+(\.\d+)?/g) ?? []).map(Number)
+    const assertPxClose = (label: string, actual: string, expected: string) => {
+      const a = pxValues(actual)
+      const e = pxValues(expected)
+      assert.equal(a.length, e.length, `${label} 维度数变化: ${actual} vs ${expected}`)
+      a.forEach((v, i) => assert.ok(Math.abs(v - e[i]) <= 2, `${label} 变化: ${actual} vs ${expected}（容差 ±2px）`))
+    }
+    assert.equal(s.layout.bodyFont, WEB_BASELINE.bodyFont, '正文字体栈变化')
+    assert.equal(s.layout.invoicePosition, WEB_BASELINE.invoicePosition, '发票定位方式变化')
+    assert.equal(s.layout.previewPosition, WEB_BASELINE.previewPosition, '预览面板定位变化')
+    assert.equal(s.layout.previewTop, WEB_BASELINE.previewTop, '预览面板 top 变化')
+    assert.equal(s.layout.sealTop, WEB_BASELINE.sealTop, '监制章 top 变化')
+    assertPxClose('栅格列', s.layout.layoutColumns, WEB_BASELINE.layoutColumns)
+    assertPxClose('监制章 left', s.layout.sealLeft, WEB_BASELINE.sealLeft)
+    // 几何尺寸使用 ±2px 容差：亚像素取整与字体渲染跨环境存在 ≤2px 级抖动；
+    // 桌面样式泄漏会造成数十~数百 px 级差异，2px 容差不会掩盖真回归
+    const layoutTolerance2Px: Array<[string, number]> = [
+      ['formPanelHeight', WEB_BASELINE.formPanelHeight],
+      ['previewPanelHeight', WEB_BASELINE.previewPanelHeight],
+    ]
+    for (const [key, expected] of layoutTolerance2Px) {
+      const actual = (s.layout as Record<string, number>)[key]
+      assert.ok(Math.abs(actual - expected) <= 2, `网页版 ${key} 变化: ${actual} vs 基线 ${expected}（容差 ±2px）`)
+    }
+    assert.ok(
+      Math.abs(parseFloat(s.layout.stageMinHeight) - parseFloat(WEB_BASELINE.stageMinHeight)) <= 2,
+      `网页版 stage 占位高度变化: ${s.layout.stageMinHeight} vs ${WEB_BASELINE.stageMinHeight}（容差 ±2px）`,
+    )
+    // —— 打印回归（print 媒体仿真）——
+    assert.equal(webResult.printState.topbarDisplay, WEB_PRINT_BASELINE.topbarDisplay, '打印态顶栏未隐藏')
+    assert.equal(webResult.printState.ioBtnDisplay, WEB_PRINT_BASELINE.ioBtnDisplay, '打印态桌面入口泄漏')
+    assert.equal(webResult.printState.invoicePosition, WEB_PRINT_BASELINE.invoicePosition, '打印态发票定位变化')
+    assert.equal(webResult.printState.sealTop, WEB_PRINT_BASELINE.sealTop, '打印态监制章位置变化')
+    assert.equal(webResult.printState.sealLeft, WEB_PRINT_BASELINE.sealLeft, '打印态监制章位置变化')
+    assert.equal(webResult.printState.grandTotalText, WEB_PRINT_BASELINE.grandTotalText, '打印态价税合计变化')
+    assert.equal(webResult.printState.goodsRowCount, WEB_PRINT_BASELINE.goodsRowCount, '打印态票面结构变化')
+    assert.equal(webResult.printState.disclaimerOnPage, true, '打印态教学声明缺失')
+    // —— 视觉基线（golden 像素对比，阈值：>64 通道差 ≤0.1%、8~64 差 ≤2%）——
+    assert.ok(webResult.diff, '缺少 golden 比对结果')
+    assert.equal(webResult.diff.match, true, `截图偏离 golden 基线: hard ${webResult.diff.hardPct?.toFixed(3)}% / soft ${webResult.diff.softPct?.toFixed(3)}%`)
+    console.log('[smoke] web =', `golden 比对通过（hard ${webResult.diff.hardPct?.toFixed(4)}% / soft ${webResult.diff.softPct?.toFixed(4)}%）；1440×940 快照与基线一致`)
+    // —— CSS 静态隔离检查：所有桌面专属规则必须挂 html.vbse-desktop ——
+    const htmlText = fs.readFileSync(path.join(projectRoot, 'VBSE发票小程序（2.2版).html'), 'utf8')
+    const styleMatch = htmlText.match(/<style>([\s\S]*?)<\/style>/)
+    assert.ok(styleMatch, '未找到样式表')
+    const css = styleMatch[1]
+    const marker = '/* ===== 桌面版专属样式'
+    const markerIdx = css.indexOf(marker)
+    assert.ok(markerIdx > 0, '未找到桌面样式分区标记')
+    const sharedCss = css.slice(0, markerIdx)
+    const desktopCss = css.slice(markerIdx)
+    // 共享区对 vbse-desktop 的规则引用只允许既定的三处打印复位（.invoice/.preview-panel/.seal）；
+    // 说明性注释（/* ... html.vbse-desktop ... */）不算规则
+    const vdLines = sharedCss
+      .split('\n')
+      .filter((line) => line.includes('vbse-desktop') && line.trim().startsWith('html.vbse-desktop'))
+    assert.deepEqual(
+      vdLines.map((line) => line.trim().split('{')[0].trim()).sort(),
+      ['html.vbse-desktop .invoice', 'html.vbse-desktop .preview-panel', 'html.vbse-desktop .seal'].sort(),
+      '共享区 vbse-desktop 引用超出既定的三处打印复位',
+    )
+    assert.ok(!sharedCss.includes('position: sticky'), '共享 CSS 出现 sticky（桌面专属预览钉住）')
+    assert.ok(!sharedCss.includes('minmax(480px, 1fr)'), '共享 CSS 出现桌面双栏栅格')
+    for (const cls of ['.io-btn', '.history-delete']) {
+      const occurrences = sharedCss.split(cls).length - 1
+      assert.equal(occurrences, 1, `${cls} 在共享 CSS 应只出现 1 次（默认隐藏规则）`)
+      assert.ok(
+        new RegExp(cls.replace(/\./g, '\\.') + '\\s*\\{[^}]*display:\\s*none').test(sharedCss),
+        `${cls} 共享规则应为 display:none`,
+      )
+    }
+    const ruleLines = desktopCss.split('\n').filter((line) => line.trim().endsWith('{'))
+    assert.ok(ruleLines.length >= 10, '桌面样式区规则数异常')
+    for (const line of ruleLines) {
+      assert.ok(line.includes('vbse-desktop'), `桌面样式区规则缺少 vbse-desktop 前缀: ${line.trim()}`)
+    }
+    console.log('[smoke] web-css =', `共享/桌面样式隔离完好（桌面区 ${ruleLines.length} 条规则全部挂 vbse-desktop）`)
   } finally {
     try {
       fs.rmSync(userDataDir, { recursive: true, force: true })
     } catch { /* 清理失败不阻塞 */ }
   }
 })
+

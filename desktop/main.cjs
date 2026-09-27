@@ -6,7 +6,7 @@
 
 const path = require('node:path')
 const fs = require('node:fs')
-const { app, BrowserWindow, ipcMain, session, Menu, screen, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, session, Menu, screen, dialog, nativeImage } = require('electron')
 
 const APP_TITLE = 'VBSE发票教学工具'
 const HTML_NAME = 'VBSE发票小程序（2.2版).html'
@@ -219,8 +219,8 @@ function createWindow() {
   })
 
   mainWindow.once('ready-to-show', () => {
-    // print/dialog 阶段需要可见窗口（隐藏窗口截图会挂起；打印对话框需可见）
-    if (!SMOKE_PHASE || SMOKE_PHASE === 'print' || SMOKE_PHASE === 'dialog') mainWindow.show()
+    // print/dialog/web 阶段需要可见窗口（隐藏窗口截图会挂起；打印对话框需可见）
+    if (!SMOKE_PHASE || SMOKE_PHASE === 'print' || SMOKE_PHASE === 'dialog' || SMOKE_PHASE === 'web') mainWindow.show()
   })
   mainWindow.on('closed', () => { mainWindow = null })
 
@@ -460,10 +460,15 @@ const BADIO_SCRIPT = `(async function () {
   return { oversizeRejected: !!(oversize && oversize.ok === false), results: results, before: before, after: after };
 })()`
 
-// 网页版零变化回归：无 preload 渲染（等价纯浏览器），固定视口采集特征快照。
-// 断言基线维护在 tests/run-desktop-smoke.ts 的 WEB_BASELINE——共享 HTML 的任何改动
-// 若改变网页版渲染/行为，这里的状态会偏离基线并在测试中报错。
-const WEB_SCRIPT = `(function () {
+// 网页版零变化回归：无 preload 渲染（等价纯浏览器），固定 1440×940 视口。
+
+// 网页版零变化回归：无 preload 渲染（等价纯浏览器），固定 1440×940 视口。
+// 第一段脚本采集行为/布局特征，第二段在 print 媒体仿真下采集打印态，
+// 最后截图与 tests/web-golden/web-1440x940.png 做像素对比。
+// 断言基线维护在 tests/run-desktop-smoke.ts 的 WEB_BASELINE/WEB_PRINT_BASELINE。
+const WEB_STATE_SCRIPT = `(function () {
+  // 视觉确定性：固定随机数（票面 QR 的 CHK 随机段使用）——仅本测试进程内生效
+  Math.random = function () { return 0.42; };
   var cs = function (el, prop) { return el ? getComputedStyle(el)[prop] : ''; };
   var formPanel = document.querySelector('.form-panel');
   var previewPanel = document.querySelector('.preview-panel');
@@ -471,8 +476,26 @@ const WEB_SCRIPT = `(function () {
   var invoice = document.getElementById('invoice');
   var seal = document.querySelector('.seal');
   var stage = document.getElementById('invoiceStage');
+  var identity = {
+    htmlClassName: document.documentElement.className,
+    hasBridge: !!window.vbseStorage,
+    hasIO: !!window.vbseIO,
+    disclaimerOnPage: document.body.innerText.indexOf('教学样票，不作为真实开票或报销凭证') >= 0,
+    teachingBadge: !!document.querySelector('.teaching-badge')
+  };
+  var companies = {
+    buyerOptions: document.querySelectorAll('#buyerCompany option').length,
+    optionsText: Array.prototype.map.call(document.querySelectorAll('#buyerCompany option'), function (o) { return o.textContent; }).join('|')
+  };
+  document.getElementById('buyerCompany').value = '7';
+  applyCompany('buyer');
+  var companyFill = {
+    name: document.getElementById('buyerName').value,
+    tax: document.getElementById('buyerTax').value
+  };
   fillSample();
   createInvoice();
+  var nextNumberAfterCreate = getNextInvoiceNumber();
   var rows = [];
   Array.prototype.forEach.call(document.querySelectorAll('#pGoodsBody tr'), function (tr) {
     var tds = tr.querySelectorAll('td');
@@ -480,41 +503,105 @@ const WEB_SCRIPT = `(function () {
       rows.push({ amount: tds[4].textContent, tax: tds[6].textContent });
     }
   });
+  var money = {
+    lineAmounts: rows.map(function (r) { return r.amount; }),
+    lineTaxes: rows.map(function (r) { return r.tax; }),
+    totalAmount: (document.getElementById('pTotalAmount') || {}).textContent || '',
+    totalTax: (document.getElementById('pTotalTax') || {}).textContent || '',
+    grandTotal: (document.getElementById('pGrandTotal') || {}).textContent || '',
+    upperAmount: (document.getElementById('pUpperAmount') || {}).textContent || ''
+  };
+  var firstId = (getHistory()[0] || {}).id;
+  loadHistory(firstId);
+  var historyRestore = {
+    formNumber: document.getElementById('invoiceNumber').value,
+    previewNumber: (document.getElementById('pInvoiceNumber') || {}).textContent || '',
+    buyerName: document.getElementById('buyerName').value
+  };
+  // 视觉固定装置：号码/日期/企业/明细/QR 全部确定，保证 golden 截图逐像素稳定
+  setNextInvoiceNumber('26412000001304070101');
+  fillForm({
+    invoiceNumber: '26412000001304070101',
+    invoiceDate: '2026-09-27',
+    buyerName: COMPANY_OPTIONS[7].name, buyerTax: COMPANY_OPTIONS[7].taxId,
+    sellerName: COMPANY_OPTIONS[0].name, sellerTax: COMPANY_OPTIONS[0].taxId,
+    drawer: '李明', remark: '购方开户银行：--;    银行账号：--;\\n销方开户银行：--;    银行账号：--',
+    lines: sampleLines
+  });
+  renderInvoice(collectInvoiceData());
   return {
-    htmlClassName: document.documentElement.className,
-    hasBridge: !!window.vbseStorage,
-    hasIO: !!window.vbseIO,
-    bodyFont: cs(document.body, 'fontFamily'),
-    layoutColumns: cs(layout, 'gridTemplateColumns'),
-    invoicePosition: cs(invoice, 'position'),
-    previewPosition: cs(previewPanel, 'position'),
-    previewTop: cs(previewPanel, 'top'),
-    sealTop: cs(seal, 'top'),
-    sealLeft: cs(seal, 'left'),
-    ioBtnDisplay: cs(document.querySelector('.io-btn'), 'display'),
-    historyDeleteDisplay: cs(document.querySelector('.history-delete'), 'display'),
-    formPanelHeight: formPanel ? formPanel.offsetHeight : 0,
-    previewPanelHeight: previewPanel ? previewPanel.offsetHeight : 0,
-    stageMinHeight: stage ? stage.style.minHeight : '',
-    viewport: { w: window.innerWidth, h: window.innerHeight },
-    invoiceScrollOk: invoice ? invoice.scrollWidth <= invoice.clientWidth + 1 : false,
-    money: {
-      lineAmounts: rows.map(function (r) { return r.amount; }),
-      lineTaxes: rows.map(function (r) { return r.tax; }),
-      totalAmount: (document.getElementById('pTotalAmount') || {}).textContent || '',
-      totalTax: (document.getElementById('pTotalTax') || {}).textContent || '',
-      grandTotal: (document.getElementById('pGrandTotal') || {}).textContent || '',
-      upperAmount: (document.getElementById('pUpperAmount') || {}).textContent || ''
-    },
+    identity: identity,
+    companies: companies,
+    companyFill: companyFill,
+    money: money,
+    historyRestore: historyRestore,
     business: {
       historyCountAfter: getHistory().length,
-      nextNumber: getNextInvoiceNumber(),
+      nextNumber: nextNumberAfterCreate,
       localStorageHistory: localStorage.getItem('vbseInvoiceHistory') !== null,
       localStorageNext: localStorage.getItem('vbseInvoiceNextNumber') !== null,
       historyCardCount: document.querySelectorAll('.history-card').length
+    },
+    layout: {
+      bodyFont: cs(document.body, 'fontFamily'),
+      layoutColumns: cs(layout, 'gridTemplateColumns'),
+      invoicePosition: cs(invoice, 'position'),
+      previewPosition: cs(previewPanel, 'position'),
+      previewTop: cs(previewPanel, 'top'),
+      sealTop: cs(seal, 'top'),
+      sealLeft: cs(seal, 'left'),
+      ioBtnDisplay: cs(document.querySelector('.io-btn'), 'display'),
+      historyDeleteDisplay: cs(document.querySelector('.history-delete'), 'display'),
+      formPanelHeight: formPanel ? formPanel.offsetHeight : 0,
+      previewPanelHeight: previewPanel ? previewPanel.offsetHeight : 0,
+      stageMinHeight: stage ? stage.style.minHeight : '',
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+      invoiceScrollOk: invoice ? invoice.scrollWidth <= invoice.clientWidth + 1 : false
     }
   };
 })()`
+
+const WEB_PRINT_SCRIPT = `(function () {
+  var cs = function (el, prop) { return el ? getComputedStyle(el)[prop] : ''; };
+  return {
+    topbarDisplay: cs(document.querySelector('.topbar'), 'display'),
+    ioBtnDisplay: cs(document.querySelector('.io-btn'), 'display'),
+    invoicePosition: cs(document.getElementById('invoice'), 'position'),
+    sealTop: cs(document.querySelector('.seal'), 'top'),
+    sealLeft: cs(document.querySelector('.seal'), 'left'),
+    disclaimerOnPage: document.body.innerText.indexOf('教学样票，不作为真实开票或报销凭证') >= 0,
+    grandTotalText: (document.getElementById('pGrandTotal') || {}).textContent || '',
+    goodsRowCount: document.querySelectorAll('#pGoodsBody tr').length
+  };
+})()`
+
+// golden 像素对比：按通道差分。>64 视为结构性差异，8~64 视为抗锯齿/渲染抖动。
+// 阈值刻意收紧：桌面样式泄漏会造成整片区域差异，远超下述上限，不会被阈值掩盖。
+function compareWebScreenshot(shotBuf, goldenBuf) {
+  const img = nativeImage.createFromBuffer(shotBuf)
+  const golden = nativeImage.createFromBuffer(goldenBuf)
+  const size = img.getSize()
+  const gsize = golden.getSize()
+  if (img.isEmpty() || golden.isEmpty()) {
+    return { match: false, reason: '截图或基线图像为空', hardPct: 100, softPct: 100 }
+  }
+  if (size.width !== gsize.width || size.height !== gsize.height) {
+    return { match: false, reason: `尺寸不同: ${size.width}x${size.height} vs ${gsize.width}x${gsize.height}`, hardPct: 100, softPct: 100 }
+  }
+  const a = img.toBitmap()
+  const b = golden.toBitmap()
+  const total = a.length / 4
+  let hard = 0
+  let soft = 0
+  for (let i = 0; i < a.length; i += 4) {
+    const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]))
+    if (d > 64) hard++
+    else if (d > 8) soft++
+  }
+  const hardPct = (hard / total) * 100
+  const softPct = (soft / total) * 100
+  return { match: hardPct <= 0.1 && softPct <= 2, hardPct, softPct, width: size.width, height: size.height }
+}
 
 async function runSmoke(phase, contents) {
   const result = { phase, ok: false }
@@ -577,6 +664,12 @@ async function runSmoke(phase, contents) {
       state.before.formNumber === state.after.formNumber &&
       state.before.historyCount === state.after.historyCount
   } else if (phase === 'web') {
+    // 等待窗口可见（show 由 ready-to-show 触发，时序可能晚于 did-finish-load 的本回调）：
+    // 隐藏窗口与可见窗口的滚动条/排版状态不同，必须先可见再测量，与 golden 截图条件一致
+    if (mainWindow && !mainWindow.isVisible()) {
+      await new Promise((resolve) => mainWindow.once('show', resolve))
+      await sleep(50)
+    }
     // 固定 1440×940 视口（调试器仿真，与窗口/屏幕无关），消除环境差异后采集快照
     process.stdout.write('WEB_STEP emulate\n')
     contents.debugger.attach('1.3')
@@ -584,22 +677,50 @@ async function runSmoke(phase, contents) {
     await contents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
       width: 1440, height: 940, deviceScaleFactor: 1, mobile: false,
     })
-    await sleep(300)
-    const state = await contents.executeJavaScript(WEB_SCRIPT, true)
-    try {
-      await contents.debugger.sendCommand('Emulation.clearDeviceMetricsOverride')
-    } catch (_) { /* 已 detach */ }
+    await contents.executeJavaScript('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))', false)
+    const state = await contents.executeJavaScript(WEB_STATE_SCRIPT, true)
+    process.stdout.write('WEB_STEP print-media\n')
+    await contents.debugger.sendCommand('Emulation.setEmulatedMedia', { media: 'print' })
+    await contents.executeJavaScript('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))', false)
+    const printState = await contents.executeJavaScript(WEB_PRINT_SCRIPT, true)
+    await contents.debugger.sendCommand('Emulation.setEmulatedMedia', { media: 'screen' })
+    await contents.executeJavaScript('new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))', false)
+    process.stdout.write('WEB_STEP screenshot\n')
+    const shot = await contents.debugger.sendCommand('Page.captureScreenshot', { format: 'png' })
     try { contents.debugger.detach() } catch (_) { /* 已分离 */ }
     result.state = state
-    result.ok = state.hasBridge === false &&
-      state.hasIO === false &&
-      String(state.htmlClassName).indexOf('vbse-desktop') < 0 &&
-      state.viewport.w === 1440 &&
-      state.viewport.h === 940 &&
-      state.business.historyCountAfter === 1 &&
-      state.business.localStorageHistory === true &&
-      state.business.localStorageNext === true &&
-      state.invoiceScrollOk === true
+    result.printState = printState
+    const goldenPath = path.resolve(__dirname, '..', 'tests', 'web-golden', 'web-1440x940.png')
+    if (process.env.VBSE_WEB_GOLDEN_WRITE === '1' || !fs.existsSync(goldenPath)) {
+      // 首次/更新基线：落盘并置红，强制人工核对后提交（不得静默生成基线蒙混过关）
+      fs.mkdirSync(path.dirname(goldenPath), { recursive: true })
+      fs.writeFileSync(goldenPath, Buffer.from(shot.data, 'base64'))
+      result.goldenWritten = true
+      result.ok = false
+      result.error = 'golden 截图已生成 tests/web-golden/web-1440x940.png；请人工核对图像内容后提交，再重跑即进入比对模式'
+    } else {
+      const diff = compareWebScreenshot(Buffer.from(shot.data, 'base64'), fs.readFileSync(goldenPath))
+      result.diff = diff
+      const layoutOk = state.identity.hasBridge === false &&
+        state.identity.hasIO === false &&
+        state.identity.htmlClassName.indexOf('vbse-desktop') < 0 &&
+        state.identity.disclaimerOnPage === true &&
+        state.identity.teachingBadge === true &&
+        state.layout.viewport.w === 1440 &&
+        state.layout.viewport.h === 940 &&
+        state.layout.invoiceScrollOk === true &&
+        state.business.historyCountAfter === 1 &&
+        state.business.localStorageHistory === true &&
+        state.business.localStorageNext === true &&
+        state.historyRestore.formNumber.length > 0 &&
+        state.historyRestore.previewNumber === state.historyRestore.formNumber
+      const printOk = printState.topbarDisplay === 'none' &&
+        printState.ioBtnDisplay === 'none' &&
+        printState.disclaimerOnPage === true &&
+        printState.sealTop === '25px' &&
+        printState.grandTotalText.length > 0
+      result.ok = layoutOk && printOk && diff.match === true
+    }
   } else if (phase === 'print') {
     await runPrintSmoke(result, contents)
   } else if (phase === 'dialog') {

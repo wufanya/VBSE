@@ -27,6 +27,26 @@ jobs:
       - name: 小程序单元测试
         run: npm test
 
+  web-regression:
+    # 网页版零变化回归 = required 硬门禁：共享 HTML 的任何改动若改变网页版渲染/行为，
+    # 此 job 失败即阻止合并。运行在 windows runner：基线字体（Microsoft YaHei）与
+    # 测量环境一致，避免 Linux 缺中文字体导致布局/截图基线整体漂移。
+    name: 网页版零变化回归（失败阻止合并）
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 网页版回归（golden 截图 + 行为/布局/打印断言）
+        run: npm run test:web-regression
+
   desktop-smoke:
     # 桌面冒烟需要真实桌面会话（Electron 窗口 + 打印）。
     # GitHub windows-latest runner 通常带交互桌面，可跑通；若 runner 环境变化导致

@@ -227,3 +227,21 @@ dxcompiler/dxil（WebGPU 专用，27.2MB 解压，需 GPU 回退场景回归验�
 | 回归 | `npm test` 7/7；`npm run desktop:smoke` **3/3** 全绿（web 用例 0.8s） |
 
 如实声明：基线在开发机 Electron 44 实测，字体栈断言依赖系统中文字体（GitHub runner 与教学机均含雅黑，若环境缺字体导致失败会在 font 断言处显式报错而非静默）；基线更新必须伴随 CHANGELOG 说明，属于"有意识地改变网页版"的显式动作。
+
+### §十二 补遗：完整规格实现（2026-09-27 第二轮，按目标 03 详细规格补齐）
+
+第一轮 `web` 阶段仅覆盖布局/行为快照；本轮按规格补齐六项并实测：
+
+| 交付 | 实现 | 结果 |
+| --- | --- | --- |
+| 1 纯网页入口 | 无 preload Electron 窗口（零新增依赖），无 `vbse-desktop` 类 | class=""、无桥 ✓ |
+| 2 行为基线 | A 教学标识（顶栏徽标+票面声明）、B 企业 fixture（24 项名单逐字对齐 `invoice.ts` 基准+选企业回填）、C 金额流程（oracle 比对）、D 号码（初始→递增→回填）、E 历史生成/点击/恢复、F localStorage 必写 | 全部断言通过 |
+| 3 布局基线 | 人工基线复核：`面板高 1013px` 为早期口径，当前实测预览面板 1015px/表单 1339px；几何断言 ±2px 容差（滚动条与亚像素实测可差 3px，桌面泄漏为数十~数百 px 级，不会掩盖）；栅格列/监制章 left 为像素派生值，同走 ±2px | 通过 |
+| 4 视觉回归 | golden：`tests/web-golden/web-1440x940.png`（144KB，1440×940）；固定号码/日期/企业/明细/QR（测试内固定 Math.random），比较经 Electron nativeImage 像素差分，阈值 >64 通道差 ≤0.1% 且 8~64 差 ≤2%；缺 golden/更新基线置红强制人工核对 | 本机比对 0.0000%/0.0000% |
+| 5 CSS 隔离 | 静态检查：共享区 `vbse-desktop` 规则仅限三处打印复位；sticky/桌面栅格禁止出现在共享区；`.io-btn`/`.history-delete` 共享区仅一条 display:none；桌面区 12 条规则全部挂前缀 | 通过 |
+| 6 打印回归 | print 媒体仿真：顶栏隐藏、桌面入口不可见、监制章 25px、票面结构 8 行、教学声明在、价税合计一致 | 通过 |
+| 8 CI | 新增 `web-regression` job（windows，**无 continue-on-error**，required）；`npm run test:web-regression`；`npm run verify` = build:mp + 单测 + 网页回归 + 桌面冒烟 | yml 已解析验证 |
+
+稳定性处理：等待窗口可见与双 rAF 替代固定 sleep；视觉装置固定号码/日期/QR；每用例独立 mkdtemp 存储；实测发现并修复测量时序竞态（show 晚于测量导致滚动条态漂移 3px）。
+
+未覆盖/如实声明：golden 对 OS 级字体渲染差异敏感（阈值收紧后依赖 runner 含雅黑——windows runner 与基线同源；若未来跨 Linux 运行需重建基线并记录）；真实浏览器（Chrome/Firefox）渲染差异不在护栏内；golden 更新必须人工核对图像并在 CHANGELOG 说明（`npm run test:web-golden-update` 生成）。

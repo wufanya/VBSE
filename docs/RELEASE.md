@@ -7,14 +7,14 @@
 
 | 工作流 | 触发 | 内容 |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | push / PR 到 main、master | `npm ci` → `build:mp` → 小程序单测；桌面冒烟单列 job 且 `continue-on-error: true`（需要真实桌面会话，允许失败但断言不删） |
+| `.github/workflows/ci.yml` | push / PR 到 main、master | 三个 job：① `build-and-test`（ubuntu，required）：`npm ci` → `build:mp` → 小程序单测；② `web-regression`（windows，**required 硬门禁，失败阻止合并**）：`npm run test:web-regression`（golden 截图比对 + 行为/布局/打印断言）；③ `desktop-smoke`（windows，`continue-on-error: true`，需要真实桌面会话，允许失败但断言不删） |
 | `.github/workflows/release.yml` | 推送 `v*` tag | `npm ci` → 构建 + 单测 → **桌面冒烟（硬门禁）** → `desktop:pack` → SHA256 → 上传 artifact + 创建 **draft** GitHub Release |
 
 发布产物：`VBSE-发票教学工具-Setup-<version>.exe` + `SHA256SUMS.txt`。
 
 ## 2. 发布步骤
 
-1. 确认 `npm run verify` 本地全绿（build:mp + 7/7 单测 + 1/1 桌面冒烟）。
+1. 确认 `npm run verify` 本地全绿（build:mp + 7/7 单测 + 1/1 网页版回归 + 3/3 桌面冒烟）。
 2. 更新 `CHANGELOG.md`：新增一节，日期 + 版本，只写真实变更。
 3. bump 版本号：`package.json` 的 `version` 决定安装包文件名（`artifactName`）。
 4. 提交并推送：
