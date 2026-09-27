@@ -28,6 +28,10 @@ def find_ide_port() -> int | None:
 
 
 def request_json(url: str, timeout: int = 10) -> tuple[int, str]:
+    # 本脚本仅探测本机微信开发者工具调试端口，禁止请求其他主机（防 SSRF）
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost"):
+        raise ValueError(f"仅允许请求本机调试端口，拒绝: {url}")
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             body = resp.read().decode("utf-8", errors="replace")
