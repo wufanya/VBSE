@@ -21,3 +21,8 @@ screenshots/
 release/
 *.log
 
+# 本地工作素材（视频汇报、教学图表、扫描工具状态），不属于仓库
+video_work/
+diagram/
+.mimosa/
+

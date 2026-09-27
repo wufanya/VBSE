@@ -35,3 +35,16 @@ contextBridge.exposeInMainWorld('vbseStorage', {
     persist()
   },
 })
+
+// 桌面版标识类：页面样式表据此应用桌面专属样式，网页版不含此类、外观不变
+function markDesktop() {
+  try {
+    document.documentElement.classList.add('vbse-desktop')
+  } catch (_) { /* 极早期失败时回退网页版外观 */ }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', markDesktop, { once: true })
+} else {
+  markDesktop()
+}

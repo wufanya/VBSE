@@ -49,7 +49,7 @@ npm test           # 发票金额、税额、历史记录、企业库匹配等�
 npm run desktop:dev    # 开发：直接启动桌面窗口（加载仓库根目录 HTML）
 npm run desktop:smoke  # 桌面冒烟测试（启动、存储、离线、打印 PDF/截图）
 npm run desktop:pack   # 打包 NSIS 安装程序，输出到 release/
-npm run icons          # 重新生成【临时占位】图标（发布前必须替换）
+npm run icons          # 从 desktop/assets/icon-source.png 重新生成 icon.ico / icon.png
 npm run verify         # 小程序构建 + 原有单测 + 桌面冒烟
 ```
 
@@ -96,10 +96,10 @@ release/VBSE-发票教学工具-Setup-<版本>.exe   # 安装程序（Windows x6
 ```text
 .\1
 ├── miniprogram/             # 微信小程序源码（.ts / .scss / .wxml）
-├── desktop/                 # 桌面版主进程、预加载脚本、临时图标
+├── desktop/                 # 桌面版主进程、预加载脚本、应用图标
 │   ├── main.cjs             # Electron 主进程（窗口、安全、存储 IPC、冒烟阶段）
 │   ├── preload.cjs          # 窄作用域存储桥（vbseStorage）
-│   └── assets/              # 临时占位图标（发布前替换）
+│   └── assets/              # 正式品牌图标（源图 icon-source.png + 生成产物）
 ├── tests/                   # 小程序单元测试 + 桌面冒烟测试
 ├── tools/                   # 小程序构建脚本、图标生成脚本
 ├── docs/                    # 开发说明、桌面验证记录、交接文档
@@ -109,8 +109,8 @@ release/VBSE-发票教学工具-Setup-<版本>.exe   # 安装程序（Windows x6
 
 ## 发布前待办
 
-- [ ] **替换临时图标**：`desktop/assets/icon.ico` / `icon.png` 由 `npm run icons` 生成，仅为占位素材，非正式品牌资源。
-- [ ] **代码签名**：评估证书与签名流程，降低 SmartScreen 误报。
+- [x] **替换临时图标**（2026-09-26 完成）：正式品牌图标已就位，更换时覆盖 `icon-source.png` 后执行 `npm run icons`。
+- [ ] **代码签名**：已评估，暂不购买证书；安装包保持未签名（详见 `docs/RELEASE.md` §3）。
 - [ ] 企业库为代码内固定预设（23 家），**不提供**后台管理或云同步。
 
 ## 说明

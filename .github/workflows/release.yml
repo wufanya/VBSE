@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 打包 Windows 安装版并发布
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建小程序 + 单元测试
+        run: |
+          npm run build:mp
+          npm test
+
+      - name: 打包 Windows 安装版
+        run: npm run desktop:pack
+        env:
+          # 代码签名（可选）：在仓库 Secrets 配置后自动生效。
+          # CSC_LINK 指向 .pfx 证书（base64 或 URL），CSC_KEY_PASSWORD 为证书密码。
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      - name: 计算 SHA256 校验和
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem 'release/*.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'release/ 下没有找到 .exe 产物' }
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash
+          "$hash  $($exe.Name)" | Out-File -FilePath 'release/SHA256SUMS.txt' -Encoding utf8NoBOM
+          Write-Host "SHA256($($exe.Name)) = $hash"
+
+      - name: 上传构建产物（artifact，保留 30 天）
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            release/*.exe
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            release/*.exe
+            release/SHA256SUMS.txt

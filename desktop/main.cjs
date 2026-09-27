@@ -6,7 +6,7 @@
 
 const path = require('node:path')
 const fs = require('node:fs')
-const { app, BrowserWindow, ipcMain, session, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron')
 
 const APP_TITLE = 'VBSE发票教学工具'
 const HTML_NAME = 'VBSE发票小程序（2.2版).html'
@@ -122,14 +122,18 @@ function guardWebContents(contents) {
 app.on('web-contents-created', (_event, contents) => guardWebContents(contents))
 
 function createWindow() {
+  // 初始尺寸不超过屏幕工作区：教学机常见 1366×768，固定 1440×940 会超出屏幕
+  const workArea = screen.getPrimaryDisplay().workAreaSize
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 940,
+    width: Math.min(1440, workArea.width),
+    height: Math.min(940, workArea.height),
     minWidth: 1100,
     minHeight: 720,
     title: APP_TITLE,
     backgroundColor: '#eef2f6',
     show: false,
+    // 打包后由 exe 图标承担窗口/任务栏图标；这里主要服务开发模式
+    icon: app.isPackaged ? undefined : path.join(__dirname, 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

@@ -1,12 +1,13 @@
-# 临时图标素材（发布前必须替换）
+# 应用图标素材
 
-本目录中的 `icon.ico` / `icon.png` 是由 `npm run icons`（`tools/generate-temp-icon.mjs`）
-生成的**临时占位素材**，仅用于让安装包、快捷方式能显示图标，
+| 文件 | 用途 |
+| --- | --- |
+| `icon-source.png` | 正式品牌图标源图（1233×1234，设计方提供，2026-09-26 起生效） |
+| `icon.ico` | 由 `npm run icons` 从源图生成：16–128px 为 32bpp BMP 条目，256px 内嵌 PNG 条目 |
+| `icon.png` | 由 `npm run icons` 生成的 256px 版本（electron-builder buildResources 预览用） |
 
-**不是 VBSE 正式品牌素材**，正式发布前必须替换为设计方提供的图标。
+日常不需要手工改 `icon.ico` / `icon.png`——更换图标时：
 
-替换步骤：
-
-1. 准备 ≥256×256 的正式图标。
-2. 覆盖 `icon.ico`（NSIS/应用图标）与 `icon.png`（预览）。
-3. 重新执行 `npm run desktop:pack`。
+1. 用新的源图覆盖 `icon-source.png`（建议 ≥512×512 正方形 PNG）。
+2. 执行 `npm run icons` 重新生成。
+3. 执行 `npm run desktop:pack` 重新打包。

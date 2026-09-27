@@ -8,7 +8,7 @@
 ## 0. 一句话现状
 
 Windows 桌面版**已经实现、已经打包、已经在 Windows 11 实机通过安装/升级/卸载与功能冒烟验收**，
-可以继续在此基线上做发布加固或功能扩展；**没有半成品功能隐藏在代码里**（唯一的临时物是占位图标）。
+可以继续在此基线上做发布加固或功能扩展；**没有半成品功能隐藏在代码里**（占位图标已于 2026-09-26 替换为正式品牌图标，见 §8 P0-1）。
 
 ## 1. 已交付产物（均为实机核实）
 
@@ -34,8 +34,9 @@ Windows 桌面版**已经实现、已经打包、已经在 Windows 11 实机通�
 - 打印对话框里**手动点选打印机并保存文件**的图形交互（打印管线与 PDF 输出已验证）。
 - 代码签名（当前未签名，SmartScreen 表现因机器信誉而异）。
 - 干净虚拟机级别的隔离安装测试（本轮在开发机上执行，安装前该应用未安装过）。
-- 正式品牌图标（当前为占位图标）。
-- CI、自动更新、macOS/Linux 目标、企业库维护 UI、数据导入导出。
+- ~~正式品牌图标~~（2026-09-26 已完成：源图 `desktop/assets/icon-source.png`，`npm run icons` 生成多尺寸 ICO）。
+- CI（2026-09-26 已完成：`.github/workflows/ci.yml` + `release.yml`，发布流程见 `docs/RELEASE.md`；Actions 首次运行结果待观察）。
+- 自动更新、macOS/Linux 目标、企业库维护 UI、数据导入导出。
 
 ## 2. 快速上手（约 10 分钟）
 
@@ -99,7 +100,7 @@ npm run desktop:pack        # 期望：release/VBSE-发票教学工具-Setup-1.0
 | `tests/run-desktop-smoke.ts`（115 行） | 依次 spawn Electron 跑 5 个阶段，用 `assert` 校验；用 `mkdtemp` 隔离数据目录 |
 | `tests/invoice.test.ts` + `tests/run-tests.ts` | 原有小程序单测（7 个），未改动 |
 | `tools/build-miniprogram.mjs` | 小程序 TS/SCSS 构建（未改动） |
-| `tools/generate-temp-icon.mjs`（158 行） | 纯 Node 生成占位 PNG/ICO（多尺寸 BMP 条目），`npm run icons` |
+| `tools/generate-icons.mjs` + `tools/resize-icon.ps1` | 从 `icon-source.png` 生成正式图标（PS 高质量缩放 + Node 组装 ICO），`npm run icons` |
 
 ### 3.4 文档
 
@@ -199,10 +200,11 @@ $env:VBSE_SMOKE='flow'; $env:VBSE_USER_DATA_DIR="$env:TEMP\vbse-dbg"
 
 ### P0 发布加固（不改业务逻辑，风险最低）
 
-1. **替换正式图标**
-   - 做法：覆盖 `desktop/assets/icon.ico`（≥256×256，多尺寸更佳）与 `icon.png`；必要时改 `tools/generate-temp-icon.mjs` 或删除它。
-   - 验收：`npm run desktop:pack` 后安装包、exe、快捷方式、任务栏、窗口图标均为正式图标；`desktop/assets/README.md` 中的临时说明可删除。
-2. **代码签名**
+1. ~~**替换正式图标**~~（2026-09-26 已完成）
+   - 做法：源图存为 `desktop/assets/icon-source.png`；新脚本 `tools/generate-icons.mjs`（PS 缩放 + Node 组装，`npm run icons`）
+     生成 16–128px BMP 条目 + 256px PNG 条目的 `icon.ico` 与 256px `icon.png`；`desktop/main.cjs` 开发模式窗口加了 `icon` 选项。
+   - 验收：ICO 结构程序化校验通过；重新打包成功（见 `docs/DESKTOP_VERIFICATION.md` §补充记录）。
+2. **代码签名**（用户已决定暂不购买证书，见 `docs/RELEASE.md` §3；若后续购买按以下方式接入）
    - 做法：在 electron-builder `win` 配置加入 `certificateFile`/`certificatePassword`（或用环境变量 `CSC_LINK`/`CSC_KEY_PASSWORD`），
      并确保安装器、主程序、卸载器都被签名。
    - 验收：`signtool verify /pa <exe>` 通过；在干净机器首次运行无 SmartScreen 红色警告；README 的 SmartScreen 说明同步更新。
@@ -230,7 +232,7 @@ $env:VBSE_SMOKE='flow'; $env:VBSE_USER_DATA_DIR="$env:TEMP\vbse-dbg"
 ### P2 可选扩展
 
 10. **自动更新**（electron-updater + 已配置的 NSIS）：验收：手动“检查更新”可用、失败时有明确提示、不外传票据数据。
-11. **多语言安装器 UI**（`nsis.language` 目前是 1033 English）：验收：安装界面可中文（注意 electron-builder v26 字段校验）。
+11. ~~**多语言安装器 UI**~~（2026-09-26 已完成：删除 `nsis.language: 1033` 强制英文配置，安装器语言跟随学生电脑的 Windows 显示语言（electron-builder 默认行为）；重新打包生效，下次安装时可目视确认向导为中文）。
 12. **跨平台**（macOS/Linux）：需重新验证打印、字体与数据目录；验收：目标平台可安装/启动/打印。
 13. **口径统一**：把金额/税额计算抽成页面与小程序共享模块（避免两处 `incrementDecimalString` 等重复逻辑），验收：两端测试一致通过。
 
@@ -265,7 +267,7 @@ $env:VBSE_SMOKE='flow'; $env:VBSE_USER_DATA_DIR="$env:TEMP\vbse-dbg"
 | `ad60d78` | 验证记录补充交付汇总 |
 
 回滚提示：桌面版是**纯新增**（除 HTML 的 3 处修改、package.json/.gitignore/README 外），若需移除桌面版：
-删 `desktop/`、`tests/run-desktop-smoke.ts`、`tools/generate-temp-icon.mjs`、`docs/DESKTOP_*.md`，
+删 `desktop/`、`tests/run-desktop-smoke.ts`、`tools/generate-icons.mjs`、`tools/resize-icon.ps1`、`docs/DESKTOP_*.md`、`docs/RELEASE.md`，
 并把 HTML 的 `storage` 适配层还原为 `localStorage`、移除 CSP meta 与教学徽标、package.json 去掉 `main`/`build`/桌面脚本。
 
 ## 12. 参考命令速查

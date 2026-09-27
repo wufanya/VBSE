@@ -583,6 +583,11 @@ button.danger { color: var(--danger); background: #fff1f0; }
     align-items: center;
 }
 
+/* 单条删除按钮仅桌面版显示（deleteHistory 函数两端都在，网页版不出现入口） */
+.history-delete {
+    display: none;
+}
+
 .toast {
     min-height: 22px;
     margin-top: 10px;
@@ -788,6 +793,71 @@ button.danger { color: var(--danger); background: #fff1f0; }
         page-break-inside: avoid;
         break-inside: avoid;
     }
+
+    /* 桌面版（html.vbse-desktop 由 Electron preload 注入）打印时恢复文档流排版 */
+    html.vbse-desktop .invoice { position: static; }
+    html.vbse-desktop .preview-panel { position: static; }
+    html.vbse-desktop .seal { top: 25px; left: 50%; }
+}
+
+/* ===== 桌面版专属样式（仅 Electron 生效，网页版不含 vbse-desktop 类） ===== */
+html.vbse-desktop body {
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+html.vbse-desktop input,
+html.vbse-desktop select,
+html.vbse-desktop textarea,
+html.vbse-desktop button {
+    font-family: inherit;
+}
+
+/* 发票用 transform 缩放后布局盒仍保持原始尺寸，改为绝对定位，
+   占位高度由 updateInvoiceScale 按缩放后高度设定，消除预览面板下方空白 */
+html.vbse-desktop .invoice-stage {
+    position: relative;
+}
+
+html.vbse-desktop .invoice {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* 监制章对齐标题列中心并下沉到分隔线处，避免压住标题文字 */
+html.vbse-desktop .seal {
+    top: 58px;
+    left: 509px;
+}
+
+/* 预览与表单对调：预览在左且滚动时固定在可视区内（sticky），表单在右随页面滚动；
+   桌面版始终双栏，表单列压缩（上限 640px）给预览让宽，明细表格过窄时横向滚动 */
+html.vbse-desktop .layout {
+    grid-template-columns: minmax(480px, 1fr) minmax(500px, 640px);
+}
+
+html.vbse-desktop .preview-panel {
+    order: -1;
+    position: sticky;
+    top: 12px;
+}
+
+html.vbse-desktop .line-editor {
+    overflow-x: auto;
+}
+
+/* 购销方名称/税号：选择企业后自动带出即隐藏，仅"手动输入企业"时显示并排一行，
+   该区块由 updateCompanyFields 切换 manual-company 类 */
+html.vbse-desktop .section:not(.manual-company) .company-manual-field {
+    display: none;
+}
+
+html.vbse-desktop .section.manual-company .company-manual-field {
+    grid-column: auto;
+}
+
+html.vbse-desktop .history-delete {
+    display: inline-block;
 }
 </style>
 </head>
@@ -830,11 +900,11 @@ button.danger { color: var(--danger); background: #fff1f0; }
                         <label for="buyerCompany">选择企业</label>
                         <select id="buyerCompany" class="company-select" onchange="applyCompany('buyer')"></select>
                     </div>
-                    <div class="field full">
+                    <div class="field full company-manual-field">
                         <label for="buyerName">名称</label>
                         <input id="buyerName">
                     </div>
-                    <div class="field full">
+                    <div class="field full company-manual-field">
                         <label for="buyerTax">统一社会信用代码/纳税人识别号</label>
                         <input id="buyerTax">
                     </div>
@@ -848,11 +918,11 @@ button.danger { color: var(--danger); background: #fff1f0; }
                         <label for="sellerCompany">选择企业</label>
                         <select id="sellerCompany" class="company-select" onchange="applyCompany('seller')"></select>
                     </div>
-                    <div class="field full">
+                    <div class="field full company-manual-field">
                         <label for="sellerName">名称</label>
                         <input id="sellerName">
                     </div>
-                    <div class="field full">
+                    <div class="field full company-manual-field">
                         <label for="sellerTax">统一社会信用代码/纳税人识别号</label>
                         <input id="sellerTax">
                     </div>
@@ -1059,8 +1129,17 @@ function populateCompanySelects() {
     });
 }
 
+// 名称/税号字段仅在选择"手动输入企业"时展示：
+// 切换标识类供桌面版 CSS 隐藏/并排使用；网页版无对应样式，字段始终显示、行为不变
+function updateCompanyFields(role) {
+    const select = byId(`${role}Company`);
+    const section = select.closest(".section");
+    if (section) section.classList.toggle("manual-company", select.value === MANUAL_COMPANY);
+}
+
 function applyCompany(role) {
     const select = byId(`${role}Company`);
+    updateCompanyFields(role);
     if (select.value === MANUAL_COMPANY) {
         byId(`${role}Name`).readOnly = false;
         byId(`${role}Tax`).readOnly = false;
@@ -1078,6 +1157,7 @@ function applyCompany(role) {
 function syncCompanySelect(role, name, taxId) {
     const index = COMPANY_OPTIONS.findIndex(company => company.name === name && company.taxId === taxId);
     byId(`${role}Company`).value = index >= 0 ? String(index) : MANUAL_COMPANY;
+    updateCompanyFields(role);
 }
 
 function getNextInvoiceNumber() {
@@ -1482,6 +1562,7 @@ function renderHistory() {
             <div class="history-actions">
                 <button class="ghost" type="button" onclick="loadHistory('${item.id}')">查看/载入</button>
                 <button class="print" type="button" onclick="printHistory('${item.id}')">打印</button>
+                <button class="danger history-delete" type="button" onclick="deleteHistory('${item.id}')">删除</button>
             </div>
         `;
         list.appendChild(card);
@@ -1509,6 +1590,15 @@ function clearHistory() {
     storage.removeItem(STORAGE_HISTORY);
     renderHistory();
     showToast("历史记录已清空");
+}
+
+// 单条删除：按钮由桌面版 CSS 控制显示（网页版 .history-delete 隐藏，行为不变）
+function deleteHistory(id) {
+    if (!confirm("确定删除这条历史记录吗？")) return;
+    const history = getHistory().filter(entry => entry.id !== id);
+    storage.setItem(STORAGE_HISTORY, JSON.stringify(history));
+    renderHistory();
+    showToast("已删除该条历史记录");
 }
 
 function fillForm(data) {
@@ -1568,6 +1658,9 @@ function boot() {
     fillSample();
     renderHistory();
     updateInvoiceScale();
+    // 桌面版 preload 在 DOMContentLoaded 才注入 vbse-desktop 标识类（此时 boot 已执行完），
+    // 监听同事件在其后重算一次缩放；网页版无该类，重算结果不变
+    document.addEventListener("DOMContentLoaded", updateInvoiceScale);
 }
 
 function updateInvoiceScale() {
@@ -1575,9 +1668,14 @@ function updateInvoiceScale() {
     const stage = byId("invoiceStage");
     const invoice = byId("invoice");
     if (!panel || !stage || !invoice) return;
-    const availableWidth = panel.clientWidth;
+    // 桌面版发票绝对定位后以面板内容区左缘为原点，可用宽度需扣除 .preview-panel
+    // 左右内边距（16px × 2），否则缩放后右缘溢出被裁；网页版保持原有算法不变。
+    // 桌面版下限放宽到 0.28：窄窗口双栏时发票按列宽缩小而不是被裁剪
+    const desktopMode = document.documentElement.classList.contains("vbse-desktop");
+    const availableWidth = panel.clientWidth - (desktopMode ? 32 : 0);
+    const minScale = desktopMode ? 0.28 : 0.45;
     const invoiceWidth = 1180;
-    const scale = Math.min(1, Math.max(0.45, availableWidth / invoiceWidth));
+    const scale = Math.min(1, Math.max(minScale, availableWidth / invoiceWidth));
     stage.style.setProperty("--invoice-scale", scale.toFixed(4));
     stage.style.minHeight = `${invoice.offsetHeight * scale}px`;
 }

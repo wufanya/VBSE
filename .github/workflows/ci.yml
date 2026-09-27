@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    name: 构建 + 小程序单测（无桌面）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建小程序
+        run: npm run build:mp
+
+      - name: 小程序单元测试
+        run: npm test
+
+  desktop-smoke:
+    # 桌面冒烟需要真实桌面会话（Electron 窗口 + 打印）。
+    # GitHub windows-latest runner 通常带交互桌面，可跑通；若 runner 环境变化导致
+    # 失败，本 job 允许失败（continue-on-error），不阻塞合并——不要删除断言本身。
+    name: 桌面冒烟（允许失败）
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 桌面冒烟（5 阶段）
+        run: npm run desktop:smoke
