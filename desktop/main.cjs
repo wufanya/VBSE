@@ -6,7 +6,7 @@
 
 const path = require('node:path')
 const fs = require('node:fs')
-const { app, BrowserWindow, ipcMain, session, Menu, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, session, Menu, screen, dialog } = require('electron')
 
 const APP_TITLE = 'VBSE发票教学工具'
 const HTML_NAME = 'VBSE发票小程序（2.2版).html'
@@ -91,6 +91,69 @@ ipcMain.on('vbse-store:save', (_event, payload) => {
     writeStoreAtomic(values)
   } catch (_) {
     // 出错时不打印任何票面内容
+  }
+})
+
+// ---- 票据导出/导入（教学材料流转；文件读写只在主进程，页面仅传 JSON 字符串） ----
+
+const MAX_EXPORT_JSON = 512 * 1024
+
+function safeExportName(name) {
+  const base = String(name || '').replace(/[\\/:*?"<>|]/g, '').trim()
+  return base && base.endsWith('.json') ? base : 'VBSE票据.json'
+}
+
+ipcMain.handle('vbse-io:export', async (_event, payload) => {
+  const json = payload && typeof payload.json === 'string' ? payload.json : ''
+  if (!json.trim() || json.length > MAX_EXPORT_JSON) {
+    return { ok: false, error: '票据数据为空或超出大小限制' }
+  }
+  let target
+  if (SMOKE_PHASE) {
+    target = process.env.VBSE_SMOKE_EXPORT_FILE || ''
+    if (!target) return { ok: false, error: '冒烟环境未配置导出路径' }
+  } else {
+    const options = {
+      title: '导出当前票据',
+      defaultPath: path.join(app.getPath('documents'), safeExportName(payload && payload.fileName)),
+      filters: [{ name: 'JSON 票据', extensions: ['json'] }],
+    }
+    const ret = mainWindow
+      ? await dialog.showSaveDialog(mainWindow, options)
+      : await dialog.showSaveDialog(options)
+    if (ret.canceled || !ret.filePath) return { ok: false, canceled: true }
+    target = ret.filePath
+  }
+  try {
+    fs.writeFileSync(target, json, 'utf8')
+  } catch (error) {
+    return { ok: false, error: `写入失败: ${error && error.code ? error.code : '未知错误'}` }
+  }
+  return { ok: true, path: target }
+})
+
+ipcMain.handle('vbse-io:import', async () => {
+  let source
+  if (SMOKE_PHASE) {
+    source = process.env.VBSE_SMOKE_IMPORT_FILE || ''
+    if (!source || !fs.existsSync(source)) return { ok: false, error: '冒烟环境未配置导入文件' }
+  } else {
+    const options = {
+      title: '导入票据 JSON',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON 票据', extensions: ['json'] }],
+    }
+    const ret = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options)
+    if (ret.canceled || !ret.filePaths || !ret.filePaths[0]) return { ok: false, canceled: true }
+    source = ret.filePaths[0]
+  }
+  try {
+    if (fs.statSync(source).size > MAX_EXPORT_JSON) return { ok: false, error: '文件超出大小限制' }
+    return { ok: true, json: fs.readFileSync(source, 'utf8') }
+  } catch (error) {
+    return { ok: false, error: `读取失败: ${error && error.code ? error.code : '未知错误'}` }
   }
 })
 
@@ -253,6 +316,24 @@ const FLOW_SCRIPT = `(function () {
     previewNumber: (document.getElementById('pInvoiceNumber') || {}).textContent || ''
   };
 
+  var money = (function () {
+    var rows = [];
+    Array.prototype.forEach.call(document.querySelectorAll('#pGoodsBody tr'), function (tr) {
+      var tds = tr.querySelectorAll('td');
+      if (tds.length >= 7 && tds[4].textContent.trim() !== '') {
+        rows.push({ amount: tds[4].textContent, tax: tds[6].textContent });
+      }
+    });
+    return {
+      lineAmounts: rows.map(function (r) { return r.amount; }),
+      lineTaxes: rows.map(function (r) { return r.tax; }),
+      totalAmount: document.getElementById('pTotalAmount').textContent,
+      totalTax: document.getElementById('pTotalTax').textContent,
+      grandTotal: document.getElementById('pGrandTotal').textContent,
+      upperAmount: document.getElementById('pUpperAmount').textContent
+    };
+  })();
+
   var firstId = (getHistory()[0] || {}).id;
   loadHistory(firstId);
   var afterLoad = {
@@ -276,10 +357,44 @@ const FLOW_SCRIPT = `(function () {
     beforeNumber: beforeNumber,
     beforeCount: beforeCount,
     afterCreate: afterCreate,
+    money: money,
     afterLoad: afterLoad,
     printCalls: printInvoked,
     afterClear: afterClear
   };
+})()`
+
+// 导出→破坏表单→导入回放：验证 JSON 往返与页面回填（文件路径由冒烟环境变量指定）
+const IO_SCRIPT = `(function () {
+  fillSample();
+  var data = collectInvoiceData();
+  return window.vbseIO.exportInvoice(JSON.stringify(data), 'VBSE票据-' + data.invoiceNumber + '.json')
+    .then(function (exp) {
+      if (!exp || !exp.ok) return { exportOk: false, exportError: exp && exp.error };
+      fillForm({
+        invoiceNumber: '0',
+        buyerName: '导入前占位',
+        buyerTax: 'x',
+        sellerName: '导入前占位',
+        sellerTax: 'y',
+        lines: [{ name: '占位', unit: '项', qty: 1, price: 1, taxRate: 0.13 }]
+      });
+      return window.vbseIO.importInvoice().then(function (imp) {
+        if (!imp || !imp.ok) return { exportOk: true, importOk: false, importError: imp && imp.error };
+        var normalized = normalizeHistoryItem(JSON.parse(imp.json));
+        fillForm(normalized);
+        renderInvoice(normalized);
+        return {
+          exportOk: true,
+          importOk: true,
+          importedJson: imp.json,
+          importedNumber: document.getElementById('invoiceNumber').value,
+          importedBuyer: document.getElementById('buyerName').value,
+          importedGrand: document.getElementById('pGrandTotal').textContent,
+          importedUpper: document.getElementById('pUpperAmount').textContent
+        };
+      });
+    });
 })()`
 
 async function runSmoke(phase, contents) {
@@ -323,6 +438,14 @@ async function runSmoke(phase, contents) {
       state.printCalls >= 1 &&
       state.afterClear.count === 0 &&
       result.storeHistoryCount === 0
+  } else if (phase === 'io') {
+    const state = await contents.executeJavaScript(IO_SCRIPT, true)
+    result.state = state
+    result.exportFile = process.env.VBSE_SMOKE_EXPORT_FILE || ''
+    result.ok = state.exportOk === true &&
+      state.importOk === true &&
+      !!result.exportFile &&
+      fs.existsSync(result.exportFile)
   } else if (phase === 'print') {
     await runPrintSmoke(result, contents)
   } else if (phase === 'dialog') {

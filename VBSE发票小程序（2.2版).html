@@ -588,6 +588,11 @@ button.danger { color: var(--danger); background: #fff1f0; }
     display: none;
 }
 
+/* 导出/导入按钮仅桌面版显示（exportInvoice/importInvoice 函数两端可运行，网页版不出现入口） */
+.io-btn {
+    display: none;
+}
+
 .toast {
     min-height: 22px;
     margin-top: 10px;
@@ -859,6 +864,10 @@ html.vbse-desktop .section.manual-company .company-manual-field {
 html.vbse-desktop .history-delete {
     display: inline-block;
 }
+
+html.vbse-desktop .io-btn {
+    display: inline-block;
+}
 </style>
 </head>
 <body>
@@ -869,6 +878,8 @@ html.vbse-desktop .history-delete {
             <span class="teaching-badge">教学样票，不作为真实开票或报销凭证</span>
         </div>
         <div class="actions">
+            <button class="ghost io-btn" type="button" onclick="importInvoice()">导入票据</button>
+            <button class="ghost io-btn" type="button" onclick="exportInvoice()">导出当前票据</button>
             <button class="print" type="button" onclick="printInvoice()">打印/导出 PDF</button>
         </div>
     </header>
@@ -1642,6 +1653,58 @@ function printInvoice() {
         renderInvoice(data);
     }
     window.print();
+}
+
+// 导出/导入票据 JSON（教学材料流转）：文件读写只在主进程完成（vbseIO 桥），
+// 页面只传/收一段 JSON 字符串；网页版无 vbseIO 且按钮隐藏，行为不变
+function exportInvoice() {
+    if (!window.vbseIO) {
+        showToast("网页版暂不支持导出，请使用桌面版");
+        return;
+    }
+    const data = collectInvoiceData();
+    const error = validateInvoice(data);
+    if (error) {
+        showToast(error);
+        return;
+    }
+    data.qrPayload = ensureQrPayload(data, false);
+    window.vbseIO.exportInvoice(JSON.stringify(data, null, 2), `VBSE票据-${data.invoiceNumber}.json`)
+        .then(ret => {
+            if (ret && ret.ok) showToast(`已导出票据到 ${ret.path}`);
+            else if (ret && !ret.canceled) showToast(`导出失败：${ret.error || "未知错误"}`);
+        })
+        .catch(() => showToast("导出失败"));
+}
+
+function importInvoice() {
+    if (!window.vbseIO) {
+        showToast("网页版暂不支持导入，请使用桌面版");
+        return;
+    }
+    window.vbseIO.importInvoice()
+        .then(ret => {
+            if (!ret || !ret.ok) {
+                if (ret && !ret.canceled) showToast(`导入失败：${ret.error || "未知错误"}`);
+                return;
+            }
+            let record;
+            try {
+                record = JSON.parse(ret.json);
+            } catch (_) {
+                showToast("文件不是有效的票据 JSON");
+                return;
+            }
+            if (!record || !Array.isArray(record.lines)) {
+                showToast("文件不是有效的票据 JSON");
+                return;
+            }
+            const normalized = normalizeHistoryItem(record);
+            fillForm(normalized);
+            renderInvoice(normalized);
+            showToast(`已导入票据 ${normalized.invoiceNumber}，核对后点"生成发票"保存`);
+        })
+        .catch(() => showToast("导入失败"));
 }
 
 function today() {

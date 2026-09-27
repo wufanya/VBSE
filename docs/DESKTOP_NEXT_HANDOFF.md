@@ -235,12 +235,14 @@ $env:VBSE_SMOKE='flow'; $env:VBSE_USER_DATA_DIR="$env:TEMP\vbse-dbg"
 11. ~~**多语言安装器 UI**~~（2026-09-26 已完成：删除 `nsis.language: 1033` 强制英文配置，安装器语言跟随学生电脑的 Windows 显示语言（electron-builder 默认行为）；重新打包生效，下次安装时可目视确认向导为中文）。
 12. **跨平台**（macOS/Linux）：需重新验证打印、字体与数据目录；验收：目标平台可安装/启动/打印。
 13. **口径统一**：把金额/税额计算抽成页面与小程序共享模块（避免两处 `incrementDecimalString` 等重复逻辑），验收：两端测试一致通过。
+    （2026-09-26 短期缓解已落地：`tests/run-desktop-smoke.ts` 现将页面渲染的明细金额/税额/合计/大写与 `invoice.ts` 基准逐项比对，口径漂移会直接挂冒烟；共享模块抽取仍未做。已发现未裁决的漂移：页面 `￥`/小程序 `¥` 货币符号、页面"宣传单"/小程序"宣传册"示例名。）
 
 ## 9. 硬性约束（违反即视为破坏性改动）
 
 1. **教学用途标注必须保留**：顶栏徽标（HTML L799）与**票面页脚**（HTML L969）都要有“教学样票，不作为真实开票或报销凭证”；
    任何文档/UI 不得把“打印 PDF”描述成真实电子发票开具。
 2. **不放宽安全基线**：不放 `nodeIntegration`、不删 CSP、不放开网络请求、不向页面暴露通用文件系统/命令执行能力。
+   （票据导出/导入的 `vbse-io:export`/`vbse-io:import` 两个固定通道是唯一例外：单文件 JSON、512KB 上限、读写全部在主进程；不得扩展为通用文件读写。）
 3. **不改 `miniprogram/` 的业务逻辑与既有测试**；两端业务规则以 `miniprogram/utils/invoice.ts` + 现有页面行为为准。
 4. **新增持久化键必须三处同步**：`desktop/main.cjs` 的 `STORE_KEYS`、`desktop/preload.cjs` 的 `ALLOWED_KEYS`、`tests/run-desktop-smoke.ts` 的断言。
 5. **不提交** `release/`、`node_modules/`、`screenshots/`、`*.log`、测试数据（`%APPDATA%\VBSE发票教学工具`）；提交前跑 `git status --short` 核对。

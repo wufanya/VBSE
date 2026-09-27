@@ -175,3 +175,19 @@ npm run verify             # 小程序构建 + 7 个原有单测 + 桌面冒烟
 
 后续可选（未做）：换 WebView2 轻壳（预期安装包 <5MB，需重写桌面壳，Win7 不可用，偏离既定架构决策）；afterPack 裁剪
 dxcompiler/dxil（WebGPU 专用，27.2MB 解压，需 GPU 回退场景回归验证）；教学机房将安装目录加入杀软排除列表缓解未签名程序首启扫描。
+
+## 十、票据导出/导入与页面端口径断言（2026-09-26 补充记录）
+
+| 项 | 结果 |
+| --- | --- |
+| 功能 | 顶栏新增"导入票据 / 导出当前票据"（`.io-btn`，沿用"入口只给桌面"显隐模式；网页版 DOM 有按钮但不渲染、无 vbseIO 时函数安全提示） |
+| 实现 | `desktop/preload.cjs` 暴露 `vbseIO`（仅两个固定通道）；`desktop/main.cjs` 新增 `vbse-io:export` / `vbse-io:import`（dialog 选路径 + 512KB 上限，文件读写只在主进程）；页面 `exportInvoice()`/`importInvoice()` 复用 `collectInvoiceData`/`normalizeHistoryItem`/`fillForm`/`renderInvoice` |
+| 冒烟 | 新增 `io` 阶段（冒烟环境变量直连文件路径，绕过对话框）：导出 → 破坏表单 → 导入回放 → 逐字段断言；`flow` 阶段新增页面渲染金额捕获 |
+| 口径基准 | 页面渲染的明细金额/税额/合计/税额合计/价税合计/大写金额与 `miniprogram/utils/invoice.ts`（`buildInvoiceLine`/`formatMoney`/`toChineseUpperMoney`）逐一比对一致 |
+| 回归 | `npm test` 7/7；`npm run desktop:smoke` 全绿（含新用例） |
+
+口径断言当轮发现的**既有双端漂移**（测试已归一/规避，待裁决统一）：
+1. 货币符号：页面渲染 `￥`（全角），`invoice.ts` 渲染 `¥`（半角）；
+2. 示例明细名：页面 `sampleLines` 为"*印刷服务*宣传单"，`invoice.ts` `SAMPLE_LINES` 为"*印刷服务*宣传册"。
+
+未验证项：真实文件对话框路径（保存/打开）未自动化验证，仅冒烟环境变量路径已验证；教师侧批量核收 JSON 的使用流程未做实机演练。

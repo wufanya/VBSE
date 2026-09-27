@@ -6,13 +6,28 @@ import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 
+import {
+  SAMPLE_LINES,
+  buildInvoiceLine,
+  formatMoney,
+  toChineseUpperMoney,
+} from '../miniprogram/utils/invoice.ts'
+
 const require = createRequire(import.meta.url)
 const projectRoot = process.cwd()
 const electronBin = require('electron')
 
+// 页面端渲染 ￥（全角）、invoice.ts 渲染 ¥（半角）——已知的显示层漂移，待用户裁决；
+// 金额断言先归一符号，聚焦计算口径本身
+const asOracleMoney = (text: string) => String(text).replace(/￥/g, '¥')
+
 type SmokeResult = Record<string, any>
 
-function runPhase(phase: string, userDataDir: string): Promise<{ code: number | null; results: SmokeResult[] }> {
+function runPhase(
+  phase: string,
+  userDataDir: string,
+  extraEnv: Record<string, string> = {},
+): Promise<{ code: number | null; results: SmokeResult[] }> {
   return new Promise((resolve, reject) => {
     const child = spawn(electronBin, [path.join(projectRoot, 'desktop', 'main.cjs')], {
       cwd: projectRoot,
@@ -20,6 +35,7 @@ function runPhase(phase: string, userDataDir: string): Promise<{ code: number | 
         ...process.env,
         VBSE_SMOKE: phase,
         VBSE_USER_DATA_DIR: userDataDir,
+        ...extraEnv,
         ELECTRON_ENABLE_LOGGING: '0',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -94,6 +110,57 @@ test('desktop app smoke: launch, storage bridge, offline page', async () => {
     const flowResult = findResult(flow.results, 'flow')
     assert.equal(flowResult.ok, true, `flow 失败: ${JSON.stringify(flowResult)}`)
     console.log('[smoke] flow =', JSON.stringify(flowResult.state))
+
+    // 4.5) 页面端业务口径断言：页面渲染结果必须与 miniprogram/utils/invoice.ts 基准一致
+    //（两份实现并存，任何一端改了计算口径这里立即失败）
+    const oracleLines = SAMPLE_LINES.map(buildInvoiceLine)
+    const oracleAmount = oracleLines.reduce((sum, line) => sum + line.amount, 0)
+    const oracleTax = oracleLines.reduce((sum, line) => sum + line.taxAmount, 0)
+    const oracleGrand = oracleAmount + oracleTax
+    const money = flowResult.state.money
+    assert.equal(
+      money.lineAmounts.join('|'),
+      oracleLines.map((line) => formatMoney(line.amount)).join('|'),
+      `页面明细金额与基准不一致: ${money.lineAmounts.join('|')}`,
+    )
+    assert.equal(
+      money.lineTaxes.join('|'),
+      oracleLines.map((line) => formatMoney(line.taxAmount)).join('|'),
+      `页面明细税额与基准不一致: ${money.lineTaxes.join('|')}`,
+    )
+    assert.equal(asOracleMoney(money.totalAmount), formatMoney(oracleAmount, true), '合计与基准不一致')
+    assert.equal(asOracleMoney(money.totalTax), formatMoney(oracleTax, true), '税额合计与基准不一致')
+    assert.equal(asOracleMoney(money.grandTotal), formatMoney(oracleGrand, true), '价税合计与基准不一致')
+    assert.equal(money.upperAmount, toChineseUpperMoney(oracleGrand), '大写金额与基准不一致')
+    console.log('[smoke] money =', `${money.grandTotal} / ${money.upperAmount}（与 invoice.ts 基准一致）`)
+
+    // 5) 导出 → 破坏表单 → 导入回放：JSON 往返 + 页面回填一致
+    const exportFile = path.join(userDataDir, 'vbse-io-export.json')
+    const io = await runPhase('io', userDataDir, {
+      VBSE_SMOKE_EXPORT_FILE: exportFile,
+      VBSE_SMOKE_IMPORT_FILE: exportFile,
+    })
+    const ioResult = findResult(io.results, 'io')
+    assert.equal(ioResult.ok, true, `io 失败: ${JSON.stringify(ioResult)}`)
+    const exportedRaw = fs.readFileSync(exportFile, 'utf8')
+    assert.equal(ioResult.state.importedJson, exportedRaw, '导入内容与导出文件不一致')
+    const exported = JSON.parse(exportedRaw)
+    assert.equal(exported.buyerName, '华晨商贸有限公司', '导出数据购方异常')
+    assert.equal(
+      exported.lines.map((line: { amount: number }) => formatMoney(line.amount)).join('|'),
+      oracleLines.map((line) => formatMoney(line.amount)).join('|'),
+      '导出 JSON 的明细金额与基准不一致',
+    )
+    assert.equal(
+      formatMoney(exported.grandTotal as number, true),
+      formatMoney(oracleGrand, true),
+      '导出 JSON 的价税合计与基准不一致',
+    )
+    assert.equal(ioResult.state.importedNumber, exported.invoiceNumber, '导入回填号码不一致')
+    assert.equal(ioResult.state.importedBuyer, exported.buyerName, '导入回填购方不一致')
+    assert.equal(asOracleMoney(ioResult.state.importedGrand), formatMoney(oracleGrand, true), '导入回填价税合计与基准不一致')
+    assert.equal(ioResult.state.importedUpper, toChineseUpperMoney(oracleGrand), '导入回填大写与基准不一致')
+    console.log('[smoke] io =', `导出/导入回放一致，价税合计 ${ioResult.state.importedGrand}`)
 
     // 5) 打印能力：打印机列表 + PDF 渲染 + 打印媒体截图
     const print = await runPhase('print', userDataDir)
