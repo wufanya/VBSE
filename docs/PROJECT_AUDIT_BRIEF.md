@@ -52,7 +52,7 @@ release/                      # 打包输出（已 gitignore）
 
 - `contextIsolation` + `sandbox` + `nodeIntegration:false`；拒绝导航/新窗口/webview；
 - `session.webRequest` 阻断全部 http/https/ws；权限请求一律拒绝；页面含 CSP；
-- 持久化走窄作用域 IPC：`vbseStorage` 仅 2 个白名单键（`vbseInvoiceHistory`/`vbseInvoiceNextNumber`），主进程侧校验、原子写、`.bak` 备份、损坏隔离（改名 `.corrupt-*`）、5MB 上限；
+- 持久化走窄作用域 IPC：`vbseStorage` 仅 2 个白名单键（`vbseInvoiceHistory`/`vbseInvoiceNextNumber`），主进程侧校验、原子写、`.bak` 备份、损坏隔离（改名 `.corrupt-*`）、5MB 上限（**读取与写入双侧尺寸检查**，超大文件不进内存）；
 - 票据导出/导入：`vbse-io:export`/`vbse-io:import` 两个固定通道，单文件 JSON、512KB 上限，文件读写全部在主进程（dialog 选路径；冒烟时由环境变量直连路径绕过对话框）——这是"不暴露通用文件能力"约束下**唯一批准的例外**；
 - 新增持久化键必须三处同步：`main.cjs STORE_KEYS`、`preload ALLOWED_KEYS`、`run-desktop-smoke.ts` 断言。
 
@@ -69,7 +69,7 @@ release/                      # 打包输出（已 gitignore）
 ## 6. 测试与验证现状
 
 - `npm test`：小程序单测 7/7（node:test + strip-types）；
-- `npm run desktop:smoke`：单测内含 6 个阶段依次 spawn Electron——basic（桥/二维码/教学标注/localStorage 未污染）、write→read（跨进程持久化）、flow（生成→号码自增→历史回填→打印→清空 + 金额口径断言）、io（导出→破坏表单→导入回放→逐字段断言）、print（打印机列表 + PDF ≥5KB + 打印媒体截图）；
+- `npm run desktop:smoke`：两个用例依次 spawn Electron——常规 6 阶段（basic 桥/二维码/教学标注、write→read 跨进程持久化、flow 生成→号码自增→历史回填→打印→清空 + 金额口径断言、io 导出/导入往返、print 打印机 + PDF ≥5KB + 打印媒体截图）+ 边界韧性用例（损坏/超大 store 隔离、`.bak` 恢复、非法导入校验矩阵、失败不污染断言）；
 - `npm run verify` = build:mp + npm test + desktop:smoke；
 - 最近一次全绿：2026-09-27（单测 7/7、冒烟全绿）。
 
@@ -93,7 +93,7 @@ release/                      # 打包输出（已 gitignore）
 2. **网页版零变化承诺**：检查共享 CSS/JS 改动是否真的对无 `vbse-desktop` 类的环境无副作用（含 `@media print`）；
 3. **IPC 面**：`vbse-io:*` 与 `vbse-store:*` 的输入校验是否可被滥用（超长字符串、路径注入、JSON 炸弹）；
 4. **工作流正确性**：ci.yml/release.yml 从未实跑，静态审查触发条件、缓存、产物路径、`continue-on-error` 的语义影响；
-5. **冒烟盲区**：6 阶段没覆盖的地方（异常路径、损坏 store 恢复、并发窗口）；
+5. **冒烟盲区**：损坏/超大 store 与非法导入已由边界韧性用例覆盖（2026-09-27）；剩余盲区如并发实例、长期存储增长、真实文件对话框路径——可作审计深挖点；
 6. **单文件 HTML 的可维护性**：1950 行内联代码的拆分利弊（注意：桌面打包依赖单文件，拆分需构建管线，勿轻率建议）。
 
 ## 9. 审计时可运行的命令

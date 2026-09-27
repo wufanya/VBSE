@@ -1372,8 +1372,8 @@ function escapeAttr(value) {
 
 function readLineItems() {
     return Array.from(document.querySelectorAll(".line-row")).map(row => {
-        const qty = Number(row.querySelector(".line-qty").value || 0);
-        const price = Number(row.querySelector(".line-price").value || 0);
+        const qty = finiteOrZero(row.querySelector(".line-qty").value);
+        const price = finiteOrZero(row.querySelector(".line-price").value);
         const taxRate = readTaxRate(row);
         const amount = qty * price;
         const taxAmount = amount * taxRate;
@@ -1391,8 +1391,8 @@ function readLineItems() {
 
 function updateLineTotals(row) {
     toggleManualTax(row);
-    const qty = Number(row.querySelector(".line-qty").value || 0);
-    const price = Number(row.querySelector(".line-price").value || 0);
+    const qty = finiteOrZero(row.querySelector(".line-qty").value);
+    const price = finiteOrZero(row.querySelector(".line-price").value);
     const taxRate = readTaxRate(row);
     const amount = qty * price;
     const taxAmount = amount * taxRate;
@@ -1400,12 +1400,19 @@ function updateLineTotals(row) {
     row.querySelector(".line-tax-amount").textContent = formatMoney(taxAmount);
 }
 
+// 边界加固：非有限数值（NaN/±Infinity/空串转数字除外）一律回落为 0，
+// 正常输入行为不变，异常输入（如 1e999）不再产生 Infinity 传染到金额计算
+function finiteOrZero(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+}
+
 function readTaxRate(row) {
     const select = row.querySelector(".tax-rate-select");
     if (select.value === MANUAL_TAX_RATE) {
-        return Number(row.querySelector(".tax-manual").value || 0) / 100;
+        return finiteOrZero(row.querySelector(".tax-manual").value) / 100;
     }
-    return Number(select.value || 0);
+    return finiteOrZero(select.value);
 }
 
 function formatTaxPercent(rate) {
@@ -1537,11 +1544,11 @@ function normalizeHistoryItem(item) {
     item.lines = (item.lines || []).map(line => ({
         name: line.name || "",
         unit: line.unit || "份",
-        qty: Number(line.qty || 0),
-        price: Number(line.price || 0),
-        taxRate: Number(line.taxRate || 0),
-        amount: Number(line.amount || 0),
-        taxAmount: Number(line.taxAmount || 0)
+        qty: finiteOrZero(line.qty),
+        price: finiteOrZero(line.price),
+        taxRate: finiteOrZero(line.taxRate),
+        amount: finiteOrZero(line.amount),
+        taxAmount: finiteOrZero(line.taxAmount)
     }));
     item.totalAmount = item.lines.reduce((sum, line) => sum + line.amount, 0);
     item.totalTax = item.lines.reduce((sum, line) => sum + line.taxAmount, 0);
@@ -1677,34 +1684,69 @@ function exportInvoice() {
         .catch(() => showToast("导出失败"));
 }
 
+// 导入 JSON 严格校验：只放行形状与数值边界都合法的票据，任何不合法整体拒绝。
+// 本工具导出的合法数据行为与此前完全一致；返回空串表示通过，否则为拒绝原因。
+function validateImportedInvoice(record) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) return "票据数据必须是对象";
+    if (typeof record.invoiceNumber !== "string" || !record.invoiceNumber.trim() || record.invoiceNumber.length > 32) return "发票号码缺失或超长";
+    if (typeof record.invoiceDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(record.invoiceDate)) return "开票日期格式应为 YYYY-MM-DD";
+    const parsedDate = new Date(record.invoiceDate + "T00:00:00Z");
+    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== record.invoiceDate) return "开票日期不是有效日期";
+    for (const [key, max] of [["buyerName", 100], ["buyerTax", 64], ["sellerName", 100], ["sellerTax", 64]]) {
+        const value = record[key];
+        if (typeof value !== "string" || !value.trim() || value.length > max) return "购销方名称/税号缺失或超长";
+    }
+    if (record.drawer !== undefined && (typeof record.drawer !== "string" || record.drawer.length > 50)) return "开票人字段不合法";
+    if (record.remark !== undefined && (typeof record.remark !== "string" || record.remark.length > 500)) return "备注字段不合法";
+    if (record.id !== undefined && (typeof record.id !== "string" || record.id.length > 64)) return "记录 id 不合法";
+    if (!Array.isArray(record.lines) || record.lines.length < 1 || record.lines.length > 200) return "项目明细必须为 1~200 行";
+    for (let i = 0; i < record.lines.length; i++) {
+        const line = record.lines[i];
+        if (!line || typeof line !== "object" || Array.isArray(line)) return `第 ${i + 1} 行明细必须是对象`;
+        if (typeof line.name !== "string" || !line.name.trim() || line.name.length > 200) return `第 ${i + 1} 行名称缺失或超长`;
+        if (typeof line.unit !== "string" || line.unit.length > 20) return `第 ${i + 1} 行单位不合法`;
+        if (!Number.isFinite(line.qty) || line.qty <= 0 || line.qty > 1e9) return `第 ${i + 1} 行数量必须是大于 0 且不超过 10 亿的有限数字`;
+        if (!Number.isFinite(line.price) || line.price < 0 || line.price > 1e9) return `第 ${i + 1} 行单价必须是 0 到 10 亿之间的有限数字`;
+        if (!Number.isFinite(line.taxRate) || line.taxRate < 0 || line.taxRate > 1) return `第 ${i + 1} 行税率必须在 0~100% 之间`;
+        if (!Number.isFinite(line.amount) || line.amount < 0 || line.amount > 1e12) return `第 ${i + 1} 行金额必须是 0 到 1 万亿之间的有限数字`;
+        if (!Number.isFinite(line.taxAmount) || line.taxAmount < 0 || line.taxAmount > 1e12) return `第 ${i + 1} 行税额必须是 0 到 1 万亿之间的有限数字`;
+    }
+    return "";
+}
+
 function importInvoice() {
     if (!window.vbseIO) {
         showToast("网页版暂不支持导入，请使用桌面版");
-        return;
+        return Promise.resolve({ ok: false, error: "网页版暂不支持导入" });
     }
-    window.vbseIO.importInvoice()
+    return window.vbseIO.importInvoice()
         .then(ret => {
             if (!ret || !ret.ok) {
                 if (ret && !ret.canceled) showToast(`导入失败：${ret.error || "未知错误"}`);
-                return;
+                return { ok: false, error: ret && ret.error };
             }
             let record;
             try {
                 record = JSON.parse(ret.json);
             } catch (_) {
                 showToast("文件不是有效的票据 JSON");
-                return;
+                return { ok: false, error: "文件不是有效的票据 JSON" };
             }
-            if (!record || !Array.isArray(record.lines)) {
-                showToast("文件不是有效的票据 JSON");
-                return;
+            const problem = validateImportedInvoice(record);
+            if (problem) {
+                showToast(`导入已拒绝：${problem}`);
+                return { ok: false, error: problem };
             }
             const normalized = normalizeHistoryItem(record);
             fillForm(normalized);
             renderInvoice(normalized);
             showToast(`已导入票据 ${normalized.invoiceNumber}，核对后点"生成发票"保存`);
+            return { ok: true };
         })
-        .catch(() => showToast("导入失败"));
+        .catch(() => {
+            showToast("导入失败");
+            return { ok: false, error: "导入失败" };
+        });
 }
 
 function today() {

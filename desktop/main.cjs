@@ -39,22 +39,29 @@ function quarantine(file) {
 
 function loadValues() {
   const file = storeFile()
+  let values = null
+  let needsQuarantine = false
   try {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
-    const values = sanitizeValues(parsed && parsed.values)
-    if (values) return values
-    quarantine(file)
+    // 读取前先做尺寸检查：超过上限的文件直接隔离，绝不读入内存
+    if (fs.statSync(file).size > MAX_STORE_JSON) {
+      needsQuarantine = true
+    } else {
+      values = sanitizeValues(JSON.parse(fs.readFileSync(file, 'utf8')).values)
+      if (!values) needsQuarantine = true
+    }
   } catch (error) {
     if (error && error.code === 'ENOENT') return {}
-    quarantine(file)
+    needsQuarantine = true
   }
+  if (needsQuarantine) quarantine(file)
+  if (values) return values
   // 主文件缺失或损坏时尝试备份
   try {
-    const parsed = JSON.parse(fs.readFileSync(`${file}.bak`, 'utf8'))
-    const values = sanitizeValues(parsed && parsed.values)
-    if (values) {
-      writeStoreAtomic(values)
-      return values
+    const parsedBak = JSON.parse(fs.readFileSync(`${file}.bak`, 'utf8'))
+    const valuesBak = sanitizeValues(parsedBak && parsedBak.values)
+    if (valuesBak) {
+      writeStoreAtomic(valuesBak)
+      return valuesBak
     }
   } catch (_) { /* 备份也不可用 */ }
   return {}
@@ -63,7 +70,8 @@ function loadValues() {
 function writeStoreAtomic(values) {
   const file = storeFile()
   const payload = JSON.stringify({ version: 1, values }, null, 2)
-  if (payload.length > MAX_STORE_JSON) return false
+  // 按字节而非字符数校验上限（中文 3 字节/字，防止 UTF-8 展开绕过）
+  if (Buffer.byteLength(payload, 'utf8') > MAX_STORE_JSON) return false
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const tmp = `${file}.tmp`
   fs.writeFileSync(tmp, payload, 'utf8')
@@ -397,6 +405,50 @@ const IO_SCRIPT = `(function () {
     });
 })()`
 
+// 非法导入边界：主进程侧拒绝超大文件 + 页面级校验矩阵 + 失败不污染表单与历史
+const BADIO_SCRIPT = `(async function () {
+  fillSample();
+  var before = {
+    formNumber: document.getElementById('invoiceNumber').value,
+    historyCount: getHistory().length
+  };
+  var oversize = await window.vbseIO.importInvoice();
+  var goodLine = { name: '合法明细', unit: '项', qty: 2, price: 3.5, taxRate: 0.13, amount: 7, taxAmount: 0.91 };
+  function recordWith(overrides) {
+    var rec = {
+      invoiceNumber: '26412000001304079999', invoiceDate: '2026-09-27',
+      buyerName: '校验购方', buyerTax: '000000000000000000',
+      sellerName: '校验销方', sellerTax: '111111111111111111',
+      drawer: '测试', remark: '', lines: [Object.assign({}, goodLine)]
+    };
+    if (overrides) overrides(rec);
+    return rec;
+  }
+  var cases = [
+    { title: 'null', rec: null, valid: false },
+    { title: 'array', rec: [], valid: false },
+    { title: 'empty object', rec: {}, valid: false },
+    { title: 'number invoiceNumber', rec: recordWith(function (r) { r.invoiceNumber = 1; }), valid: false },
+    { title: 'impossible date', rec: recordWith(function (r) { r.invoiceDate = '2026-02-31'; }), valid: false },
+    { title: 'negative qty', rec: recordWith(function (r) { r.lines[0].qty = -1; }), valid: false },
+    { title: 'string qty', rec: recordWith(function (r) { r.lines[0].qty = '12abc'; }), valid: false },
+    { title: 'taxRate > 1', rec: recordWith(function (r) { r.lines[0].taxRate = 1.5; }), valid: false },
+    { title: 'Infinity price', rec: recordWith(function (r) { r.lines[0].price = Infinity; }), valid: false },
+    { title: 'missing amount', rec: recordWith(function (r) { delete r.lines[0].amount; }), valid: false },
+    { title: 'too many lines', rec: recordWith(function (r) { r.lines = []; for (var i = 0; i < 201; i++) r.lines.push(Object.assign({}, goodLine)); }), valid: false },
+    { title: 'json 1e999 -> Infinity', rec: JSON.parse('{"invoiceNumber":"N","invoiceDate":"2026-09-27","buyerName":"a","buyerTax":"b","sellerName":"c","sellerTax":"d","lines":[{"name":"x","unit":"项","qty":1e999,"price":1,"taxRate":0.13,"amount":1,"taxAmount":0.13}]}'), valid: false },
+    { title: 'valid record', rec: recordWith(null), valid: true }
+  ];
+  var results = cases.map(function (c) {
+    return { title: c.title, got: validateImportedInvoice(c.rec), valid: c.valid };
+  });
+  var after = {
+    formNumber: document.getElementById('invoiceNumber').value,
+    historyCount: getHistory().length
+  };
+  return { oversizeRejected: !!(oversize && oversize.ok === false), results: results, before: before, after: after };
+})()`
+
 async function runSmoke(phase, contents) {
   const result = { phase, ok: false }
 
@@ -446,6 +498,16 @@ async function runSmoke(phase, contents) {
       state.importOk === true &&
       !!result.exportFile &&
       fs.existsSync(result.exportFile)
+  } else if (phase === 'badio') {
+    const state = await contents.executeJavaScript(BADIO_SCRIPT, true)
+    result.state = state
+    const rejected = state.results.filter((r) => !r.valid)
+    const accepted = state.results.filter((r) => r.valid)
+    result.ok = state.oversizeRejected === true &&
+      rejected.every((r) => r.got !== "") &&
+      accepted.every((r) => r.got === "") &&
+      state.before.formNumber === state.after.formNumber &&
+      state.before.historyCount === state.after.historyCount
   } else if (phase === 'print') {
     await runPrintSmoke(result, contents)
   } else if (phase === 'dialog') {

@@ -36,7 +36,7 @@ npm run verify             # 小程序构建 + 7 个原有单测 + 桌面冒烟
 
 结果：`npm run verify` 全部通过（build:mp 成功；原有测试 7/7 pass；桌面冒烟 1/1 pass，耗时约 4.3s）。
 
-冒烟覆盖内容（`tests/run-desktop-smoke.ts` 驱动 `desktop/main.cjs` 的 6 个阶段；io 阶段为 2026-09-27 新增并补跑通过，见 §十）：
+冒烟覆盖内容（`tests/run-desktop-smoke.ts` 驱动 `desktop/main.cjs` 的常规 6 个阶段 + 2026-09-27 新增 badio 边界阶段，见 §十一）：
 
 | 阶段 | 验证点 | 结果 |
 | --- | --- | --- |
@@ -96,7 +96,7 @@ npm run verify             # 小程序构建 + 7 个原有单测 + 桌面冒烟
 | --- | --- | --- |
 | `npm run build:mp` | 小程序 TS/SCSS 构建 | ✅ 成功 |
 | `npm test` | 小程序单元测试 | ✅ 7/7 pass |
-| `npm run desktop:smoke` | 桌面冒烟（6 阶段现状；本表记录的 2026-09-26 回归尚未加入 io 阶段，见 §十） | ✅ 1/1 pass（约 4.8s） |
+| `npm run desktop:smoke` | 桌面冒烟（本表记录的 2026-09-26 回归时尚无 io/badio 阶段；现为常规 6 阶段 + 边界用例，见 §十、§十一） | ✅ 1/1 pass（约 4.8s） |
 | `npm run verify` | 上述三项串联 | ✅ 全部通过 |
 | `npm run desktop:pack` | NSIS 安装包 | ✅ `release/VBSE-发票教学工具-Setup-1.0.0.exe` |
 
@@ -192,3 +192,16 @@ dxcompiler/dxil（WebGPU 专用，27.2MB 解压，需 GPU 回退场景回归验�
 2. 示例明细名：页面 `sampleLines` 为"*印刷服务*宣传单"，`invoice.ts` `SAMPLE_LINES` 为"*印刷服务*宣传册"。
 
 未验证项：真实文件对话框路径（保存/打开）未自动化验证，仅冒烟环境变量路径已验证；教师侧批量核收 JSON 的使用流程未做实机演练。
+
+## 十一、输入与持久化边界加固（2026-09-27 补充记录）
+
+| 项 | 结果 |
+| --- | --- |
+| store 读取侧 | `loadValues()` 在 `readFile/JSON.parse` **之前** `statSync` 检查尺寸，超 5MB 直接隔离（不读入内存）；损坏/非法 JSON 同样隔离后走 `.bak` 恢复 |
+| store 写入侧 | `writeStoreAtomic` 上限改按 `Buffer.byteLength`（UTF-8 字节）校验，防中文 3 字节展开绕过字符数上限 |
+| 数值边界 | 页面 `readLineItems`/`updateLineTotals`/`readTaxRate`/`normalizeHistoryItem` 的数值入口统一 `finiteOrZero`（`Number.isFinite` 回落），`1e999`/NaN 不再传染金额计算；正常输入行为不变 |
+| 导入校验 | 新增页面级 `validateImportedInvoice(record)`：对象形状、日期（含 2026-02-31 类无效日期回转校验）、字段长度上限、明细 1~200 行、qty/price/taxRate/amount/taxAmount 的有限性与合理边界；任何不合法整体拒绝并 toast 原因，绝不写入表单/历史 |
+| 冒烟 | 新增 `badio` 阶段 + 韧性测试用例：损坏 store 启动并隔离、超大 store（6MB）隔离、`.bak` 自动恢复（数据不丢）、主进程拒绝 >512KB 导入文件、12 个非法导入用例全部拒绝且合法用例放行、失败前后表单与历史逐字段一致 |
+| 回归 | `npm test` 7/7；`npm run desktop:smoke` 2/2 全绿（含全部既有阶段） |
+
+如实声明：非法导入的"主进程拒绝超大文件"由环境变量路径覆盖；页面级校验矩阵通过直调 `validateImportedInvoice` 覆盖（导入对话框交互仍无法自动化）；`quarantine` 隔离产物命名为 `invoice-store.corrupt-<时间戳>.json`（既有行为，测试已按此断言）。
