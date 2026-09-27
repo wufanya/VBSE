@@ -26,3 +26,6 @@ video_work/
 diagram/
 .mimosa/
 
+
+# 本地打包/分享压缩包不入库
+*.rar

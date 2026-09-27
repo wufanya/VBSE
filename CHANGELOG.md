@@ -6,6 +6,7 @@
 - 持久化改用 `%APPDATA%\VBSE发票教学工具\invoice-store.json`（原子写入 + `.bak` 备份 + 损坏隔离 + 键白名单），网页版仍走 `localStorage`，行为不变。
 - 安全基线：`contextIsolation` / `sandbox` / 拒绝导航与新窗口 / 阻断全部网络请求 / CSP。
 - 新增 8 个冒烟阶段（basic/write/read/flow/io/badio/web/print，`npm run desktop:smoke`）与整体回归命令 `npm run verify`。
+- 网页回归跨机器稳定化（2026-09-27）：依据 runner 实测证据（布局差 2~3px 源于字体二进制版本、golden 全分辨率逐像素比对被跨机器字体光栅化噪声淹没），golden 比对改为 4× 降采样结构性比对（块均值吸收字形噪声，结构性回归仍必失败）+ 全分辨率差分降级为诊断数据；几何容差 ±3px 并记录实测依据；CI 失败详情转 `::error::` 注解（run 页面 404 的替代诊断通道）。三层防回归：golden 结构比对（视觉）+ DOM/契约断言（内容）+ 计算样式断言（样式）。
 - 舍入口径裁决落地（2026-09-27）：用户确认"每行先按分舍入再汇总"为统一口径，`roundMoney` 从核心导出，网页版行金额/税额计算与行内预览改走同一舍入管线——极端小数输入下两端合计差异（最多 1 分）自此消除；历史旧记录不迁移不重算。漂移 #3 解决；#1（￥/¥ 显示约定）与 #2（宣传单/宣传册）仍按适配层维持现状。
 - 双端业务核心统一（2026-09-27 目标 04）：新增唯一人工维护业务源 `shared/invoice-core.ts`（金额/税额/格式化/人民币大写/号码递增/企业预设/示例数据/normalize），`npm run build:shared` 生成小程序模块与 HTML 注入块，消除 HTML 与小程序的两份手工同步实现；`npm run check:generated` + CI 过期检测防止产物过期；网页版函数改为核心薄适配，golden 截图 0.0000% 差异、单测/冒烟/网页回归全绿。三项历史漂移（￥/¥ 符号、宣传单/宣传册示例名、舍入语义）以显示约定适配层保持现状，待产品裁决。
 - 网页版零变化回归护栏（2026-09-27）：`web` 阶段以无 preload 的窗口渲染共享 HTML（等价纯浏览器网页版），固定 1440×940 视口采集布局/字体/入口显隐/存储路径/业务结果特征，与实测基线逐项断言；并含 **golden 截图像素比对**（`tests/web-golden/web-1440x940.png`，固定号码/日期/QR 确定性装置）、打印态断言（print 媒体仿真）、CSS 静态隔离检查（所有桌面规则必须挂 `html.vbse-desktop`）。独立脚本 `npm run test:web-regression`；CI 新增 `web-regression` required 硬门禁 job（失败阻止合并）。未来抽取共享业务核心时，任何改变网页版表现的改动都会被测试拦截（基线维护于 `tests/run-desktop-smoke.ts` 的 `WEB_BASELINE`/`WEB_PRINT_BASELINE`，更新基线必须在 CHANGELOG 说明）。
