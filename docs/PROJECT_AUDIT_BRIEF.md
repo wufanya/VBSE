@@ -60,7 +60,7 @@ release/                      # 打包输出（已 gitignore）
 
 业务规则存在**两份手工维护的实现**：HTML 内联 JS 与 `miniprogram/utils/invoice.ts`。`COMPANY_OPTIONS`（23 家企业）、`incrementDecimalString`、`formatMoney`、`toChineseUpperMoney`、示例数据等均重复。单测只覆盖小程序那份，页面那份此前零测试。
 
-2026-09-27 已加缓解（但未根治）：`run-desktop-smoke.ts` 新增口径断言——页面实际渲染的明细金额/税额/合计/税额合计/价税合计/大写金额必须与 `invoice.ts` 基准（`buildInvoiceLine`/`formatMoney`/`toChineseUpperMoney`）逐项一致，导出/导入往返也走同一基准。共享模块抽取（交接文档 P2-13）**仍未做**。
+**2026-09-27 目标 04 起架构已统一**：唯一人工业务源为 `shared/invoice-core.ts`（零 import 纯函数）；`miniprogram/utils/invoice.ts` 与共享 HTML 的 `INVOICE-CORE` 块均为 `npm run build:shared` 的生成产物（过期由 `npm run check:generated` + CI 检测）。网页版函数为 VBSECore 薄适配，web regression 含 source-of-truth 守卫（HTML 中重现第二份实现会直接失败）。三项历史漂移以显示约定适配层保持现状、待产品裁决：#1 ￥/¥ 货币符号、#2 示例"宣传单/宣传册"、#3 行金额舍入语义（网页原始浮点 vs 核心按分舍入，极端输入展示可差 1 分）。共享模块抽取（交接文档 P2-13）**机制已完成**，裁决漂移后即完全统一。
 
 **当前已发现、待用户裁决的双端漂移（测试已归一规避，两处都原样保留）：**
 1. 货币符号：页面渲染 `￥`（全角 U+FFE5），`invoice.ts` 渲染 `¥`（半角 U+00A5）；

@@ -5,8 +5,10 @@
   "main": "desktop/main.cjs",
   "scripts": {
     "build:mp": "node tools/build-miniprogram.mjs",
+    "build:shared": "node tools/build-shared.mjs",
+    "check:generated": "node tools/build-shared.mjs --check",
     "test": "node --experimental-strip-types tests/run-tests.ts",
-    "verify": "npm run build:mp && npm test && npm run test:web-regression && npm run desktop:smoke",
+    "verify": "npm run build:shared && npm run build:mp && npm test && npm run test:web-regression && npm run desktop:smoke",
     "desktop:dev": "electron desktop/main.cjs",
     "desktop:smoke": "node --experimental-strip-types tests/run-desktop-smoke.ts",
     "test:desktop": "npm run desktop:smoke",

@@ -245,3 +245,17 @@ dxcompiler/dxil（WebGPU 专用，27.2MB 解压，需 GPU 回退场景回归验�
 稳定性处理：等待窗口可见与双 rAF 替代固定 sleep；视觉装置固定号码/日期/QR；每用例独立 mkdtemp 存储；实测发现并修复测量时序竞态（show 晚于测量导致滚动条态漂移 3px）。
 
 未覆盖/如实声明：golden 对 OS 级字体渲染差异敏感（阈值收紧后依赖 runner 含雅黑——windows runner 与基线同源；若未来跨 Linux 运行需重建基线并记录）；真实浏览器（Chrome/Firefox）渲染差异不在护栏内；golden 更新必须人工核对图像并在 CHANGELOG 说明（`npm run test:web-golden-update` 生成）。
+
+## 十三、双端业务核心统一（2026-09-27 目标 04 补充记录）
+
+| 项 | 结果 |
+| --- | --- |
+| 架构 | 唯一人工源 `shared/invoice-core.ts`（零 import 纯函数，禁 DOM/window/wx/文件系统）→ `npm run build:shared`（tools/build-shared.mjs）生成两端产物：① `miniprogram/utils/invoice.ts`（小程序 TS 模块，API 与迁移前完全一致，调用方零改动）；② 共享 HTML 的 `INVOICE-CORE` 标记块（`window.VBSECore` IIFE，29 个导出） |
+| 页面适配层 | `incrementDecimalString`/`formatDateCn`/`formatMoney`/`formatUnitPrice`/`formatTaxPercent`/`toChineseUpperMoney`/`ensureQrPayload`/`today` 改为 VBSECore 薄适配；`COMPANY_OPTIONS`/`sampleLines` 取自核心 |
+| 漂移处理 | 漂移以"显示约定适配层"落地、不改变任何一端当前行为：#1 ￥/¥ → 网页 formatMoney 适配层 replace；#2 宣传单/宣传册 → sampleLines 适配层 replace。两项均为一行可删的显式约定，产品裁决后即可逐字统一 |
+| 新发现漂移 #3 | **舍入语义**：核心 `buildInvoiceLine` 行金额按分四舍五入（含 EPSILON），网页版 collectInvoiceData 为原始浮点直算、展示时才定格到分——对含超两位小数的极端输入两者展示可差 1 分。按规格未擅自统一：网页版保留原管线，本表记录待裁决 |
+| 守卫 | web regression 新增 source-of-truth 静态守卫：生成块恰一个；核心块之外禁止重现 `const COMPANY_OPTIONS = [`、大写数字表字面量；8 个页面函数必须为 VBSECore 薄适配（防第二份实现回归） |
+| 生成管理 | `npm run check:generated`（build → git 比对逻辑内置）；CI build-and-test 新增"生成产物过期检测"步骤 |
+| 回归 | `npm test` 7/7（直接测生成产物=核心）；`test:web-regression` 1/1（golden 0.0000% 差异）；`desktop:smoke` 3/3；`npm run verify` 全链绿 |
+
+未覆盖/待裁决（阻塞完全统一的三项，均为产品决策而非工程问题）：#1 符号、#2 示例名、#3 舍入语义。裁决后各项均为一处小改动（删适配 replace / 改核心数据 / 统一管线），护栏会自动验证统一后的行为。

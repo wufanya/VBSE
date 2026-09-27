@@ -21,6 +21,9 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      - name: 生成产物过期检测（shared/invoice-core.ts ↔ 两端产物）
+        run: npm run check:generated
+
       - name: 构建小程序
         run: npm run build:mp
 

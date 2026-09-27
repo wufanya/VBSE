@@ -1,6 +1,3 @@
-// 本文件由 tools/build-shared.mjs 从 shared/invoice-core.ts 自动生成——禁止手工修改。
-// 业务源：shared/invoice-core.ts；重新生成：npm run build:shared；过期检测：npm run check:generated
-
 // ============================================================================
 // VBSE 发票教学工具 · 共享业务核心（唯一人工维护的 Source of Truth）
 // ----------------------------------------------------------------------------

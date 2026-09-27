@@ -414,6 +414,19 @@ test('web version zero-change regression (no preload, 1440x940)', async () => {
     for (const line of ruleLines) {
       assert.ok(line.includes('vbse-desktop'), `桌面样式区规则缺少 vbse-desktop 前缀: ${line.trim()}`)
     }
+    // —— Source-of-truth 守卫（目标 04）：核心规则只能经生成块进入 HTML ——
+    // 守卫范围 = 核心生成块之外的文本（生成块内部的声明是合法产物）
+    const coreBegin = htmlText.indexOf('INVOICE-CORE:BEGIN')
+    const coreEnd = htmlText.indexOf('INVOICE-CORE:END')
+    assert.ok(coreBegin > 0 && coreEnd > coreBegin, 'INVOICE-CORE 生成块缺失')
+    const htmlOutsideCore = htmlText.slice(0, coreBegin) + htmlText.slice(coreEnd)
+    assert.equal(htmlText.split('INVOICE-CORE:BEGIN').length - 1, 1, 'INVOICE-CORE 生成块应恰好一个')
+    assert.ok(!htmlOutsideCore.includes('const COMPANY_OPTIONS = ['), 'COMPANY_OPTIONS 出现手写数组（应使用 VBSECore.COMPANY_OPTIONS）')
+    assert.ok(!htmlOutsideCore.includes('"零", "壹", "贰"'), '人民币大写数字表出现第二份实现')
+    for (const name of ['incrementDecimalString', 'formatMoney', 'toChineseUpperMoney', 'formatDateCn', 'formatUnitPrice', 'formatTaxPercent', 'ensureQrPayload', 'today']) {
+      const delegate = new RegExp(`function ${name}\\([^)]*\\)\\s*\\{[^}]*VBSECore\\.`)
+      assert.ok(delegate.test(htmlOutsideCore), `页面函数 ${name} 应为 VBSECore 薄适配（不得重新实现）`)
+    }
     console.log('[smoke] web-css =', `共享/桌面样式隔离完好（桌面区 ${ruleLines.length} 条规则全部挂 vbse-desktop）`)
   } finally {
     try {

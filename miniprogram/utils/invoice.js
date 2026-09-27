@@ -1,4 +1,6 @@
 "use strict";
+// 本文件由 tools/build-shared.mjs 从 shared/invoice-core.ts 自动生成——禁止手工修改。
+// 业务源：shared/invoice-core.ts；重新生成：npm run build:shared；过期检测：npm run check:generated
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SAMPLE_LINES = exports.COMPANY_OPTIONS = exports.MANUAL_TAX_RATE = exports.MANUAL_COMPANY = exports.DEFAULT_INVOICE_NUMBER = exports.STORAGE_HISTORY = exports.STORAGE_NEXT_NUMBER = void 0;
 exports.todayString = todayString;
@@ -23,6 +25,29 @@ exports.createEmptyLine = createEmptyLine;
 exports.createDefaultDraft = createDefaultDraft;
 exports.createSampleDraft = createSampleDraft;
 exports.normalizeHistoryRecord = normalizeHistoryRecord;
+// ============================================================================
+// VBSE 发票教学工具 · 共享业务核心（唯一人工维护的 Source of Truth）
+// ----------------------------------------------------------------------------
+// 本文件是金额计算、税额、格式化、人民币大写、号码递增、企业预设、示例数据与
+// 数据 normalize 的唯一实现位置。网页版（经 build:shared 注入单文件 HTML）、
+// 桌面版（加载同一 HTML）与微信小程序（经生成产物 miniprogram/utils/invoice.ts）
+// 均从这里获得同一规则。
+//
+// 硬性要求：
+// 1. 禁止 import 任何东西——必须保持零依赖（不得依赖 DOM/window/document/
+//    Electron/IPC/localStorage/微信 wx API/CSS/文件系统），输入普通数据 → 返回普通数据；
+// 2. 修改本文件后必须运行 `npm run build:shared` 重新生成两端产物，
+//    并通过 `npm run check:generated` 确认产物未过期；
+// 3. 任何让网页版/桌面版/小程序行为发生变化的修改，必须先经产品裁决并在
+//    CHANGELOG 中说明（web regression / golden 基线是验收标准，不是障碍）。
+//
+// 已知待裁决的双端历史漂移（详见 docs/DESKTOP_VERIFICATION.md §十三，勿顺手统一）：
+// #1 货币符号：核心输出半角 ¥，网页版显示约定为全角 ￥（网页适配层做替换）；
+// #2 示例明细名：核心为"*印刷服务*宣传册"，网页版显示约定为"宣传单"（适配层替换）；
+// #3 舍入语义：核心 buildInvoiceLine 对行金额按分四舍五入；网页版历史上是原始
+//    浮点直算、展示时才定格到分——对含超两位小数的极端输入，两者展示可差 1 分，
+//    网页版在统一裁决前保留原管线。
+// ============================================================================
 exports.STORAGE_NEXT_NUMBER = 'vbseInvoiceNextNumber';
 exports.STORAGE_HISTORY = 'vbseInvoiceHistory';
 exports.DEFAULT_INVOICE_NUMBER = '26412000001304072701';
@@ -216,7 +241,7 @@ function buildInvoice(draft, options) {
     };
     invoice.qrPayload = ensureQrPayload({
         invoiceNumber: invoice.invoiceNumber,
-        invoiceDate: invoice.invoiceDate,
+        invoiceDate: draft.invoiceDate,
         qrPayload: draft.qrPayload,
     }, options && options.forceNewQr !== undefined ? options.forceNewQr : false);
     return invoice;

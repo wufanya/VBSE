@@ -97,7 +97,9 @@ npm run desktop:pack        # 期望：release/VBSE-发票教学工具-Setup-1.0
 
 | 文件 | 说明 |
 | --- | --- |
-| `tests/run-desktop-smoke.ts`（424 行） | 三个用例：常规 6 阶段（flow 内含与 `invoice.ts` 基准的金额口径断言；io 为导出/导入往返）、边界韧性（损坏/超大 store、.bak 恢复、非法导入校验矩阵）、**网页版零变化回归**（无 preload 渲染 + 固定视口 + golden 截图像素比对 + 打印态断言 + CSS 静态隔离检查，基线见 `WEB_BASELINE`/`WEB_PRINT_BASELINE`），用 `assert` 校验；用 `mkdtemp` 隔离数据目录 |
+| `shared/invoice-core.ts` | **唯一人工维护的业务核心**（金额/税额/格式化/大写/号码/企业/示例/normalize，零依赖纯函数）；改这里后必须 `npm run build:shared` 重新生成两端产物 |
+| `tools/build-shared.mjs` | `build:shared`（生成 miniprogram/utils/invoice.ts + 注入 HTML 核心块）与 `check:generated`（过期检测，CI 已接入） |
+| `tests/run-desktop-smoke.ts`（424 行） | 三个用例：常规 6 阶段（flow 内含与 `invoice.ts` 基准的金额口径断言；io 为导出/导入往返）、边界韧性（损坏/超大 store、.bak 恢复、非法导入校验矩阵）、**网页版零变化回归**（无 preload 渲染 + 固定视口 + golden 截图像素比对 + 打印态断言 + CSS 静态隔离检查 + source-of-truth 守卫，基线见 `WEB_BASELINE`/`WEB_PRINT_BASELINE`），用 `assert` 校验；用 `mkdtemp` 隔离数据目录 |
 | `tests/invoice.test.ts` + `tests/run-tests.ts` | 原有小程序单测（7 个），未改动 |
 | `tools/build-miniprogram.mjs` | 小程序 TS/SCSS 构建（未改动） |
 | `tools/generate-icons.mjs` + `tools/resize-icon.ps1` | 从 `icon-source.png` 生成正式图标（PS 高质量缩放 + Node 组装 ICO），`npm run icons` |
