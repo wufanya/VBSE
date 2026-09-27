@@ -5,7 +5,7 @@
 - 新增 Windows 桌面安装版（Electron + NSIS）：封装单文件 HTML 页面，行为与网页版一致，天然离线。
 - 持久化改用 `%APPDATA%\VBSE发票教学工具\invoice-store.json`（原子写入 + `.bak` 备份 + 损坏隔离 + 键白名单），网页版仍走 `localStorage`，行为不变。
 - 安全基线：`contextIsolation` / `sandbox` / 拒绝导航与新窗口 / 阻断全部网络请求 / CSP。
-- 新增 5 阶段桌面冒烟测试（`npm run desktop:smoke`）与整体回归命令 `npm run verify`。
+- 新增 6 阶段桌面冒烟测试（basic/write/read/flow/io/print，`npm run desktop:smoke`）与整体回归命令 `npm run verify`。
 - 桌面版新增"导出当前票据 / 导入票据 JSON"（顶栏按钮，仅桌面版显示）：文件读写只在主进程完成，纯本地离线；冒烟测试新增导出/导入往返用例，并新增页面端业务口径断言（页面渲染的金额/税额/价税合计/大写必须与 `miniprogram/utils/invoice.ts` 基准一致）。
 - 安装包：`release/VBSE-发票教学工具-Setup-1.0.0.exe`，已在 Windows 11 实机通过安装/升级/卸载与功能验收（详见 `docs/DESKTOP_VERIFICATION.md`）。
 - 已知临时项：安装包未做代码签名（用户选择暂不购买证书）。应用图标已于 2026-09-26 替换为正式品牌图标。

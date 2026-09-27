@@ -8,7 +8,7 @@
 | 工作流 | 触发 | 内容 |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | push / PR 到 main、master | `npm ci` → `build:mp` → 小程序单测；桌面冒烟单列 job 且 `continue-on-error: true`（需要真实桌面会话，允许失败但断言不删） |
-| `.github/workflows/release.yml` | 推送 `v*` tag | `npm ci` → 构建 + 单测 → `desktop:pack` → SHA256 → 上传 artifact + 创建 **draft** GitHub Release |
+| `.github/workflows/release.yml` | 推送 `v*` tag | `npm ci` → 构建 + 单测 → **桌面冒烟（硬门禁）** → `desktop:pack` → SHA256 → 上传 artifact + 创建 **draft** GitHub Release |
 
 发布产物：`VBSE-发票教学工具-Setup-<version>.exe` + `SHA256SUMS.txt`。
 
@@ -44,5 +44,7 @@ electron-builder 会自动签名安装器/主程序/卸载器。验收标准见
 - CI 的 `desktop-smoke` job 依赖 runner 提供交互桌面；GitHub windows-latest 通常可用，
   但属 runner 环境行为，失败不阻塞合并（`continue-on-error`）。若要强约束，请在自托管
   Windows runner（带桌面会话）上运行并把该开关去掉。
-- release 工作流未跑桌面冒烟（发布前请务必本地 `npm run verify`）。
+- release 工作流在 `desktop:pack` **之前**运行桌面冒烟，且为**硬门禁**（无 `continue-on-error`）：
+  冒烟失败则整个 job 失败，不产出安装包、不创建 Release（fail-closed）。若 runner 缺交互桌面
+  导致冒烟失败，应修复 runner 环境，而不是放宽门禁。发布前仍建议本地 `npm run verify`。
 - 教学标注、离线与数据本地化等硬性约束见 `docs/DESKTOP_NEXT_HANDOFF.md` §9，发布不受影响。

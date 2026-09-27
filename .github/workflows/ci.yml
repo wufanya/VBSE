@@ -45,5 +45,5 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
-      - name: 桌面冒烟（5 阶段）
+      - name: 桌面冒烟（6 阶段）
         run: npm run desktop:smoke

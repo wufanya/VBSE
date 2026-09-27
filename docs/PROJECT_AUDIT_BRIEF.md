@@ -36,7 +36,7 @@ docs/DESKTOP_NEXT_HANDOFF.md  # 最全的交接文档（§9 硬性约束、§8 �
 docs/DESKTOP_VERIFICATION.md  # 历轮验证记录（§一~§十，含未验证项）
 docs/RELEASE.md               # 发布流程
 .github/workflows/ci.yml      # CI：build-and-test(ubuntu) + desktop-smoke(windows, continue-on-error)
-.github/workflows/release.yml # tag v* → NSIS + SHA256 + draft Release
+.github/workflows/release.yml # tag v* → 构建+单测 → 桌面冒烟（硬门禁）→ NSIS + SHA256 + draft Release
 release/                      # 打包输出（已 gitignore）
 ```
 

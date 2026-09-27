@@ -47,7 +47,7 @@ npm test           # 发票金额、税额、历史记录、企业库匹配等�
 
 ```bash
 npm run desktop:dev    # 开发：直接启动桌面窗口（加载仓库根目录 HTML）
-npm run desktop:smoke  # 桌面冒烟测试（启动、存储、离线、打印 PDF/截图）
+npm run desktop:smoke  # 桌面冒烟测试（启动、存储、离线、导出/导入、打印 PDF/截图）
 npm run desktop:pack   # 打包 NSIS 安装程序，输出到 release/
 npm run icons          # 从 desktop/assets/icon-source.png 重新生成 icon.ico / icon.png
 npm run verify         # 小程序构建 + 原有单测 + 桌面冒烟

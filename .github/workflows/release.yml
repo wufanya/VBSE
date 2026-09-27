@@ -28,6 +28,9 @@ jobs:
           npm run build:mp
           npm test
 
+      - name: 桌面冒烟（发布门禁：失败不产出安装包与 Release）
+        run: npm run desktop:smoke
+
       - name: 打包 Windows 安装版
         run: npm run desktop:pack
         env:

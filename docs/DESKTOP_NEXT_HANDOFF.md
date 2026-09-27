@@ -17,7 +17,7 @@ Windows 桌面版**已经实现、已经打包、已经在 Windows 11 实机通�
 | 安装包 | `G:\AAAAAAAAAAAA\fapiao\release\VBSE-发票教学工具-Setup-1.0.0.exe`（111,796,678 字节，Windows x64 NSIS） |
 | 构建命令 | `npm install` → `npm run desktop:pack`；产物目录 `release/`（已 gitignore） |
 | 开发命令 | `npm run desktop:dev` |
-| 冒烟命令 | `npm run desktop:smoke`（5 阶段，约 5s） |
+| 冒烟命令 | `npm run desktop:smoke`（6 阶段，约 6s） |
 | 回归命令 | `npm run verify` = `build:mp` + 小程序单测 + 桌面冒烟 → 当前**全绿**（7/7 + 1/1） |
 | 运行数据 | `%APPDATA%\VBSE发票教学工具\invoice-store.json`（`.bak` 备份） |
 | 安装位置 | `%LOCALAPPDATA%\Programs\vbse-invoice-miniprogram\`（目录名取自 package.json `name`，非中文名） |
@@ -97,7 +97,7 @@ npm run desktop:pack        # 期望：release/VBSE-发票教学工具-Setup-1.0
 
 | 文件 | 说明 |
 | --- | --- |
-| `tests/run-desktop-smoke.ts`（115 行） | 依次 spawn Electron 跑 5 个阶段，用 `assert` 校验；用 `mkdtemp` 隔离数据目录 |
+| `tests/run-desktop-smoke.ts`（182 行） | 依次 spawn Electron 跑 6 个阶段（flow 内含与 `invoice.ts` 基准的金额口径断言；io 为导出/导入往返），用 `assert` 校验；用 `mkdtemp` 隔离数据目录 |
 | `tests/invoice.test.ts` + `tests/run-tests.ts` | 原有小程序单测（7 个），未改动 |
 | `tools/build-miniprogram.mjs` | 小程序 TS/SCSS 构建（未改动） |
 | `tools/generate-icons.mjs` + `tools/resize-icon.ps1` | 从 `icon-source.png` 生成正式图标（PS 高质量缩放 + Node 组装 ICO），`npm run icons` |
@@ -152,7 +152,7 @@ npm run desktop:pack        # 期望：release/VBSE-发票教学工具-Setup-1.0
 ## 6. 验证体系与如何扩展
 
 ```bash
-npm run desktop:smoke     # 5 阶段：basic → write → read → flow → print
+npm run desktop:smoke     # 6 阶段：basic → write → read → flow → io → print
 npm run verify            # 小程序构建 + 小程序单测 + 桌面冒烟
 ```
 
