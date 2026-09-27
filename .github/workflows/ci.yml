@@ -52,8 +52,9 @@ jobs:
         run: |
           npm run test:web-regression 2>&1 | Tee-Object -FilePath web-regression-output.txt
           if ($LASTEXITCODE -ne 0) {
-            # 失败详情转为 error 注解（公开 API 可读，供无浏览器访问时诊断）
-            Get-Content web-regression-output.txt -Tail 10 | ForEach-Object { if ($_.Trim()) { "::error::$_" } }
+            # 失败详情转为注解（公开 API 可读）：只挑诊断关键行，避免被 10 条上限截断
+            Select-String -Path web-regression-output.txt -Pattern 'AssertionError|SMOKE_RESULT|not ok|✖|web 失败|actual:|expected:' |
+              Select-Object -Last 10 | ForEach-Object { "::error::$($_.Line.Substring(0, [Math]::Min(380, $_.Line.Length)))" }
             exit 1
           }
 
@@ -80,6 +81,7 @@ jobs:
         run: |
           npm run desktop:smoke 2>&1 | Tee-Object -FilePath desktop-smoke-output.txt
           if ($LASTEXITCODE -ne 0) {
-            Get-Content desktop-smoke-output.txt -Tail 10 | ForEach-Object { if ($_.Trim()) { "::warning::$_" } }
+            Select-String -Path desktop-smoke-output.txt -Pattern 'AssertionError|SMOKE_RESULT|not ok|✖|web 失败|actual:|expected:' |
+              Select-Object -Last 10 | ForEach-Object { "::warning::$($_.Line.Substring(0, [Math]::Min(380, $_.Line.Length)))" }
             exit 1
           }

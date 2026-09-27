@@ -293,7 +293,19 @@ test('web version zero-change regression (no preload, 1440x940)', async () => {
   try {
     const web = await runPhase('web', userDataDir)
     const webResult = findResult(web.results, 'web')
-    // golden 首次生成属于置红动作：必须人工核对图像并提交后，重跑才进入比对模式
+    // golden 首次生成属于置红动作：必须人工核对图像并提交后，重跑才进入比对模式。
+    // 失败消息用紧凑诊断对象（CI 注解有 1KB 截断，完整 JSON 装不下）
+    if (!webResult.ok) {
+      const st = webResult.state || {}
+      const diag = JSON.stringify({
+        error: webResult.error,
+        layout: st.layout,
+        printState: webResult.printState,
+        diff: webResult.diff,
+        business: st.business,
+      })
+      assert.equal(webResult.ok, true, `web 失败: ${diag}`)
+    }
     assert.equal(webResult.ok, true, `web 失败: ${JSON.stringify(webResult)}`)
     const s = webResult.state
     // —— A. 页面身份与教学安全标识 ——
