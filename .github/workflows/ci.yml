@@ -48,7 +48,14 @@ jobs:
         run: npm ci
 
       - name: 网页版回归（golden 截图 + 行为/布局/打印断言）
-        run: npm run test:web-regression
+        shell: pwsh
+        run: |
+          npm run test:web-regression 2>&1 | Tee-Object -FilePath web-regression-output.txt
+          if ($LASTEXITCODE -ne 0) {
+            # 失败详情转为 error 注解（公开 API 可读，供无浏览器访问时诊断）
+            Get-Content web-regression-output.txt -Tail 10 | ForEach-Object { if ($_.Trim()) { "::error::$_" } }
+            exit 1
+          }
 
   desktop-smoke:
     # 桌面冒烟需要真实桌面会话（Electron 窗口 + 打印）。
@@ -69,4 +76,10 @@ jobs:
         run: npm ci
 
       - name: 桌面冒烟（常规 6 阶段 + 边界/网页回归用例）
-        run: npm run desktop:smoke
+        shell: pwsh
+        run: |
+          npm run desktop:smoke 2>&1 | Tee-Object -FilePath desktop-smoke-output.txt
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content desktop-smoke-output.txt -Tail 10 | ForEach-Object { if ($_.Trim()) { "::warning::$_" } }
+            exit 1
+          }
