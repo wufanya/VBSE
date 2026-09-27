@@ -240,6 +240,45 @@ test('desktop smoke: corrupt/oversized store and illegal import resilience', asy
     assert.equal(findResult(readC.results, 'read').ok, true, '.bak 恢复失败')
     assert.ok(fs.existsSync(path.join(dirC, 'invoice-store.json')), '恢复后未重建主文件')
 
+    // C2) 主文件缺失但 .bak 有效：同样必须走备份恢复
+    const dirC2 = mk('vbse-bak-miss-')
+    fs.writeFileSync(
+      path.join(dirC2, 'invoice-store.json.bak'),
+      JSON.stringify({
+        version: 1,
+        values: {
+          vbseInvoiceNextNumber: '26412000001304072777',
+          vbseInvoiceHistory: JSON.stringify([{
+            id: 'bak-2', invoiceNumber: '26412000001304072777', invoiceDate: '2026-09-27',
+            buyerName: '备份购方', buyerTax: '000000000000000000',
+            sellerName: '备份销方', sellerTax: '111111111111111111',
+            drawer: 'bak', remark: '',
+            lines: [{ name: '备份明细', unit: '项', qty: 1, price: 1, taxRate: 0.13, amount: 1, taxAmount: 0.13 }],
+          }]),
+        },
+      }),
+      'utf8',
+    )
+    const readC2 = await runPhase('read', dirC2)
+    assert.equal(findResult(readC2.results, 'read').ok, true, '主文件缺失时 .bak 恢复失败')
+    assert.ok(fs.existsSync(path.join(dirC2, 'invoice-store.json')), '恢复后未重建主文件')
+
+    // C3) 主文件缺失 + .bak 超大：不读入内存、不崩溃，等效空 store 启动
+    const dirC3 = mk('vbse-bakbig-')
+    fs.writeFileSync(path.join(dirC3, 'invoice-store.json.bak'), '{"values":"' + 'x'.repeat(6 * 1024 * 1024) + '"}', 'utf8')
+    const basicC3 = await runPhase('basic', dirC3)
+    assert.equal(findResult(basicC3.results, 'basic').ok, true, '超大 .bak 下应用未能正常启动')
+
+    // C4) 主文件与 .bak 双损坏：不崩溃，等效空 store 启动
+    const dirC4 = mk('vbse-both-')
+    fs.writeFileSync(path.join(dirC4, 'invoice-store.json'), '{bad', 'utf8')
+    fs.writeFileSync(path.join(dirC4, 'invoice-store.json.bak'), '{also-bad', 'utf8')
+    const basicC4 = await runPhase('basic', dirC4)
+    assert.equal(findResult(basicC4.results, 'basic').ok, true, '双损坏 store 下应用未能正常启动')
+    await runPhase('write', dirC4)
+    const readC4 = await runPhase('read', dirC4)
+    assert.equal(findResult(readC4.results, 'read').ok, true, '双损坏恢复后写入回读失败')
+
     // D) 非法导入：主进程拒绝超大文件；页面校验矩阵全部按预期拒绝/放行；失败不污染表单与历史
     const dirD = mk('vbse-badio-')
     const bigImport = path.join(dirD, 'bad-import.json')
@@ -248,6 +287,7 @@ test('desktop smoke: corrupt/oversized store and illegal import resilience', asy
     const badResult = findResult(badio.results, 'badio')
     assert.equal(badResult.ok, true, `badio 失败: ${JSON.stringify(badResult)}`)
     assert.equal(badResult.state.oversizeRejected, true, '主进程未拒绝超大导入文件')
+    assert.equal(badResult.state.exportOversizeRejected, true, '导出未按 UTF-8 字节口径拒绝超限数据（中文 3 字节/字）')
     assert.equal(badResult.state.before.formNumber, badResult.state.after.formNumber, '非法导入污染了表单')
     assert.equal(badResult.state.before.historyCount, badResult.state.after.historyCount, '非法导入污染了历史')
     console.log('[smoke] badio =', JSON.stringify(badResult.state.results.map((r: { title: string; got: string }) => `${r.title}:${r.got ? '拒绝' : '通过'}`)))
@@ -321,6 +361,10 @@ test('web version zero-change regression (no preload, 1440x940)', async () => {
     assert.equal(s.identity.hasIO, false, '网页版不应有 vbseIO 桥')
     assert.equal(s.identity.disclaimerOnPage, true, '票面教学声明缺失')
     assert.equal(s.identity.teachingBadge, true, '顶栏教学徽标缺失')
+    // —— getHistory 语义防御（合法 JSON 非法结构 → 空数组且 renderHistory 不崩溃）——
+    for (const [bad, ok] of Object.entries(s.historyGuard || {})) {
+      assert.equal(ok, true, `getHistory 对 ${bad} 未正确防御`)
+    }
     // —— E/F. 桌面专属入口实际不可见（computed style，而非仅 DOM 存在）——
     assert.equal(s.layout.ioBtnDisplay, 'none', '导出/导入按钮在网页版可见（桌面入口泄漏）')
     assert.equal(s.layout.historyDeleteDisplay, 'none', '单条删除按钮在网页版可见（桌面入口泄漏）')

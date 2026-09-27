@@ -23,6 +23,9 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      - name: 生成产物一致性检查（shared core ↔ 两端产物）
+        run: npm run check:generated
+
       - name: 构建小程序 + 单元测试
         run: |
           npm run build:mp

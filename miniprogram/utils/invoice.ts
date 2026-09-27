@@ -17,12 +17,10 @@
 // 3. 任何让网页版/桌面版/小程序行为发生变化的修改，必须先经产品裁决并在
 //    CHANGELOG 中说明（web regression / golden 基线是验收标准，不是障碍）。
 //
-// 已知待裁决的双端历史漂移（详见 docs/DESKTOP_VERIFICATION.md §十三，勿顺手统一）：
-// #1 货币符号：核心输出半角 ¥，网页版显示约定为全角 ￥（网页适配层做替换）；
-// #2 示例明细名：核心为"*印刷服务*宣传册"，网页版显示约定为"宣传单"（适配层替换）；
-// #3 舍入语义：核心 buildInvoiceLine 对行金额按分四舍五入；网页版历史上是原始
-//    浮点直算、展示时才定格到分——对含超两位小数的极端输入，两者展示可差 1 分，
-//    网页版在统一裁决前保留原管线。
+// 双端历史漂移状态（详见 docs/DESKTOP_VERIFICATION.md §十三）：
+// #1 货币符号：核心输出半角 ¥，网页适配层按显示约定替换为全角 ￥——保留，产品裁决后删适配即可；
+// #2 示例明细名：核心为"*印刷服务*宣传册"，网页适配层替换显示为"宣传单"——保留，同上；
+// #3 舍入语义：已于 2026-09-27 裁决为"每行先按分舍入再汇总"并全端统一（roundMoney 已导出）。
 // ============================================================================
 
 export const STORAGE_NEXT_NUMBER = 'vbseInvoiceNextNumber'
@@ -117,6 +115,17 @@ const SECTION_UNITS = ['', '万', '亿', '兆']
 const UNITS = ['', '拾', '佰', '仟']
 const TAX_RATE_OPTIONS = [0, 0.06, 0.09, 0.13]
 
+// 数值边界（与网页版导入校验同一套上限体系）：教学场景的保守上限，
+// 足够覆盖正常样例、阻止 1e200 级"合法有限但荒谬巨大"输入把乘积推成 Infinity
+const MAX_LINE_QTY = 1e9
+const MAX_LINE_PRICE = 1e9
+const MAX_LINE_AMOUNT = 1e12
+
+function finiteNumber(value: unknown): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
 export function todayString(date = new Date()): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
@@ -174,6 +183,8 @@ export function getTaxRateValue(rate: number): string {
 
 export function toChineseUpperMoney(value: number): string {
   const number = Math.round(Math.abs(Number(value || 0)) * 100)
+  // 最后一层防御：NaN/±Infinity 绝不进入循环（NaN 已被 `|| 0` 吸收，Infinity 必须显式拒绝）
+  if (!Number.isFinite(number)) return 'ⓧ零圆整'
   const integer = Math.floor(number / 100)
   const fraction = number % 100
 
@@ -226,9 +237,16 @@ function sectionToChinese(section: number): string {
 }
 
 export function buildInvoiceLine(line: InvoiceLineDraft): InvoiceLine {
-  const qty = Number(line.qty || 0)
-  const price = Number(line.price || 0)
-  const taxRate = Number(line.taxRate || 0)
+  // 防御（发布前收尾）：NaN 会绕过 `<=0` 类比较，有限但巨大的输入（如 1e200）
+  // 乘积可能溢出为 Infinity——非法/越界/溢出一律归零。清洗必须发生在计算之前，
+  // 保证返回的 amount 恒等于 round(返回的 qty × 返回的 price)。合法输入应先经
+  // validateInvoiceDraft（含 isFinite 与上限检查），正常数值行为不变。
+  const qtyRaw = finiteNumber(line.qty)
+  const priceRaw = finiteNumber(line.price)
+  const taxRateRaw = finiteNumber(line.taxRate)
+  const qty = qtyRaw > 0 && qtyRaw <= MAX_LINE_QTY ? qtyRaw : 0
+  const price = priceRaw >= 0 && priceRaw <= MAX_LINE_PRICE ? priceRaw : 0
+  const taxRate = taxRateRaw >= 0 && taxRateRaw <= 1 ? taxRateRaw : 0
   const amount = roundMoney(qty * price)
   const taxAmount = roundMoney(amount * taxRate)
   return {
@@ -237,8 +255,8 @@ export function buildInvoiceLine(line: InvoiceLineDraft): InvoiceLine {
     qty,
     price,
     taxRate,
-    amount,
-    taxAmount,
+    amount: Number.isFinite(amount) && amount >= 0 && amount <= MAX_LINE_AMOUNT ? amount : 0,
+    taxAmount: Number.isFinite(taxAmount) && taxAmount >= 0 && taxAmount <= MAX_LINE_AMOUNT ? taxAmount : 0,
   }
 }
 
@@ -313,8 +331,19 @@ export function validateInvoiceDraft(draft: InvoiceDraft): string {
   if (!draft.sellerName || !draft.sellerTax) return '请选择或填写销售方名称和税号'
   if (draft.lines.length === 0) return '请至少填写一行项目明细'
   if (draft.lines.some((line) => !String(line.name || '').trim())) return '项目明细的名称不能为空'
-  if (draft.lines.some((line) => Number(line.qty) <= 0 || Number(line.price) < 0)) return '数量必须大于 0，不含税单价不能为负数'
-  if (draft.lines.some((line) => Number(line.taxRate) < 0 || Number(line.taxRate) > 1)) return '税率请输入 0 到 100 之间的百分比'
+  // isFinite 显式检查：NaN 会绕过 `<=0` / `>1` 类比较；上限沿用网页版导入校验同一套体系
+  if (
+    draft.lines.some((line) => {
+      const qty = Number(line.qty)
+      const price = Number(line.price)
+      const taxRate = Number(line.taxRate)
+      return (
+        !Number.isFinite(qty) || qty <= 0 || qty > MAX_LINE_QTY ||
+        !Number.isFinite(price) || price < 0 || price > MAX_LINE_PRICE ||
+        !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1
+      )
+    })
+  ) return '数量必须大于 0，不含税单价不能为负数'
   return ''
 }
 

@@ -1082,12 +1082,10 @@ window.VBSECore = (function () {
 // 3. 任何让网页版/桌面版/小程序行为发生变化的修改，必须先经产品裁决并在
 //    CHANGELOG 中说明（web regression / golden 基线是验收标准，不是障碍）。
 //
-// 已知待裁决的双端历史漂移（详见 docs/DESKTOP_VERIFICATION.md §十三，勿顺手统一）：
-// #1 货币符号：核心输出半角 ¥，网页版显示约定为全角 ￥（网页适配层做替换）；
-// #2 示例明细名：核心为"*印刷服务*宣传册"，网页版显示约定为"宣传单"（适配层替换）；
-// #3 舍入语义：核心 buildInvoiceLine 对行金额按分四舍五入；网页版历史上是原始
-//    浮点直算、展示时才定格到分——对含超两位小数的极端输入，两者展示可差 1 分，
-//    网页版在统一裁决前保留原管线。
+// 双端历史漂移状态（详见 docs/DESKTOP_VERIFICATION.md §十三）：
+// #1 货币符号：核心输出半角 ¥，网页适配层按显示约定替换为全角 ￥——保留，产品裁决后删适配即可；
+// #2 示例明细名：核心为"*印刷服务*宣传册"，网页适配层替换显示为"宣传单"——保留，同上；
+// #3 舍入语义：已于 2026-09-27 裁决为"每行先按分舍入再汇总"并全端统一（roundMoney 已导出）。
 // ============================================================================
 const STORAGE_NEXT_NUMBER = 'vbseInvoiceNextNumber';
 const STORAGE_HISTORY = 'vbseInvoiceHistory';
@@ -1128,6 +1126,15 @@ const DIGITS = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '
 const SECTION_UNITS = ['', '万', '亿', '兆'];
 const UNITS = ['', '拾', '佰', '仟'];
 const TAX_RATE_OPTIONS = [0, 0.06, 0.09, 0.13];
+// 数值边界（与网页版导入校验同一套上限体系）：教学场景的保守上限，
+// 足够覆盖正常样例、阻止 1e200 级"合法有限但荒谬巨大"输入把乘积推成 Infinity
+const MAX_LINE_QTY = 1e9;
+const MAX_LINE_PRICE = 1e9;
+const MAX_LINE_AMOUNT = 1e12;
+function finiteNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+}
 function todayString(date = new Date()) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -1179,6 +1186,9 @@ function getTaxRateValue(rate) {
 }
 function toChineseUpperMoney(value) {
     const number = Math.round(Math.abs(Number(value || 0)) * 100);
+    // 最后一层防御：NaN/±Infinity 绝不进入循环（NaN 已被 `|| 0` 吸收，Infinity 必须显式拒绝）
+    if (!Number.isFinite(number))
+        return 'ⓧ零圆整';
     const integer = Math.floor(number / 100);
     const fraction = number % 100;
     let intText = '';
@@ -1233,9 +1243,16 @@ function sectionToChinese(section) {
     return result;
 }
 function buildInvoiceLine(line) {
-    const qty = Number(line.qty || 0);
-    const price = Number(line.price || 0);
-    const taxRate = Number(line.taxRate || 0);
+    // 防御（发布前收尾）：NaN 会绕过 `<=0` 类比较，有限但巨大的输入（如 1e200）
+    // 乘积可能溢出为 Infinity——非法/越界/溢出一律归零。清洗必须发生在计算之前，
+    // 保证返回的 amount 恒等于 round(返回的 qty × 返回的 price)。合法输入应先经
+    // validateInvoiceDraft（含 isFinite 与上限检查），正常数值行为不变。
+    const qtyRaw = finiteNumber(line.qty);
+    const priceRaw = finiteNumber(line.price);
+    const taxRateRaw = finiteNumber(line.taxRate);
+    const qty = qtyRaw > 0 && qtyRaw <= MAX_LINE_QTY ? qtyRaw : 0;
+    const price = priceRaw >= 0 && priceRaw <= MAX_LINE_PRICE ? priceRaw : 0;
+    const taxRate = taxRateRaw >= 0 && taxRateRaw <= 1 ? taxRateRaw : 0;
     const amount = roundMoney(qty * price);
     const taxAmount = roundMoney(amount * taxRate);
     return {
@@ -1244,8 +1261,8 @@ function buildInvoiceLine(line) {
         qty,
         price,
         taxRate,
-        amount,
-        taxAmount,
+        amount: Number.isFinite(amount) && amount >= 0 && amount <= MAX_LINE_AMOUNT ? amount : 0,
+        taxAmount: Number.isFinite(taxAmount) && taxAmount >= 0 && taxAmount <= MAX_LINE_AMOUNT ? taxAmount : 0,
     };
 }
 function ensureQrPayload(data, forceNew, randomFactory = defaultRandomFactory) {
@@ -1307,10 +1324,16 @@ function validateInvoiceDraft(draft) {
         return '请至少填写一行项目明细';
     if (draft.lines.some((line) => !String(line.name || '').trim()))
         return '项目明细的名称不能为空';
-    if (draft.lines.some((line) => Number(line.qty) <= 0 || Number(line.price) < 0))
+    // isFinite 显式检查：NaN 会绕过 `<=0` / `>1` 类比较；上限沿用网页版导入校验同一套体系
+    if (draft.lines.some((line) => {
+        const qty = Number(line.qty);
+        const price = Number(line.price);
+        const taxRate = Number(line.taxRate);
+        return (!Number.isFinite(qty) || qty <= 0 || qty > MAX_LINE_QTY ||
+            !Number.isFinite(price) || price < 0 || price > MAX_LINE_PRICE ||
+            !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1);
+    }))
         return '数量必须大于 0，不含税单价不能为负数';
-    if (draft.lines.some((line) => Number(line.taxRate) < 0 || Number(line.taxRate) > 1))
-        return '税率请输入 0 到 100 之间的百分比';
     return '';
 }
 function findCompanyValue(name, taxId) {
@@ -1518,10 +1541,6 @@ function toChineseUpperMoney(value) {
     return VBSECore.toChineseUpperMoney(value);
 }
 
-function toChineseUpperMoney(value) {
-    return VBSECore.toChineseUpperMoney(value);
-}
-
 function addLineItem(line = {}) {
     const row = document.createElement("div");
     row.className = "line-row";
@@ -1644,11 +1663,11 @@ function updateLineTotals(row) {
     const qty = finiteOrZero(row.querySelector(".line-qty").value);
     const price = finiteOrZero(row.querySelector(".line-price").value);
     const taxRate = readTaxRate(row);
-    // 行内预览与票面同一舍入口径（每行先舍入再汇总）
+    // 行内预览与票面同一舍入口径（每行先舍入再汇总）；溢出值在预览中按 0 显示（生成时会被校验拒绝）
     const amount = VBSECore.roundMoney(qty * price);
     const taxAmount = VBSECore.roundMoney(amount * taxRate);
-    row.querySelector(".line-amount").textContent = formatMoney(amount);
-    row.querySelector(".line-tax-amount").textContent = formatMoney(taxAmount);
+    row.querySelector(".line-amount").textContent = formatMoney(Number.isFinite(amount) ? amount : 0);
+    row.querySelector(".line-tax-amount").textContent = formatMoney(Number.isFinite(taxAmount) ? taxAmount : 0);
 }
 
 // 边界加固：非有限数值（NaN/±Infinity/空串转数字除外）一律回落为 0，
@@ -1702,6 +1721,8 @@ function validateInvoice(data) {
     if (data.lines.some(line => !line.name)) return "项目明细的名称不能为空";
     if (data.lines.some(line => line.qty <= 0 || line.price < 0)) return "数量必须大于 0，不含税单价不能为负数";
     if (data.lines.some(line => line.taxRate < 0 || line.taxRate > 1)) return "税率请输入 0 到 100 之间的百分比";
+    // 数值上限（与核心 roundMoney 防御、导入校验同一套体系）：挡住"有限但荒谬巨大"的输入
+    if (data.lines.some(line => !Number.isFinite(line.amount) || line.amount > 1e12)) return "金额超出合理范围";
     return "";
 }
 
@@ -1782,7 +1803,9 @@ function saveHistory(data) {
 
 function getHistory() {
     try {
-        return JSON.parse(storage.getItem(STORAGE_HISTORY) || "[]");
+        // 防御：合法 JSON 但非法语义结构（"null"/"{}"/"123"/"true"/字符串）回退空数组
+        const parsed = JSON.parse(storage.getItem(STORAGE_HISTORY) || "[]");
+        return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
         return [];
     }

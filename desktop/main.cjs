@@ -50,20 +50,25 @@ function loadValues() {
       if (!values) needsQuarantine = true
     }
   } catch (error) {
-    if (error && error.code === 'ENOENT') return {}
-    needsQuarantine = true
+    // 主文件缺失时同样走备份恢复路径（与"主文件缺失或损坏时尝试备份"的约定一致）
+    if (error && error.code === 'ENOENT') needsQuarantine = false
+    else needsQuarantine = true
   }
-  if (needsQuarantine) quarantine(file)
+  if (needsQuarantine && fs.existsSync(file)) quarantine(file)
   if (values) return values
-  // 主文件缺失或损坏时尝试备份
+  // 尝试备份：.bak 与主文件同样先 statSync 检查尺寸再读取，绝不读入超大备份
+  let bakValues = null
   try {
-    const parsedBak = JSON.parse(fs.readFileSync(`${file}.bak`, 'utf8'))
-    const valuesBak = sanitizeValues(parsedBak && parsedBak.values)
-    if (valuesBak) {
-      writeStoreAtomic(valuesBak)
-      return valuesBak
+    if (fs.statSync(`${file}.bak`).size > MAX_STORE_JSON) {
+      bakValues = null
+    } else {
+      bakValues = sanitizeValues(JSON.parse(fs.readFileSync(`${file}.bak`, 'utf8')).values)
     }
   } catch (_) { /* 备份也不可用 */ }
+  if (bakValues) {
+    writeStoreAtomic(bakValues)
+    return bakValues
+  }
   return {}
 }
 
@@ -113,7 +118,9 @@ function safeExportName(name) {
 
 ipcMain.handle('vbse-io:export', async (_event, payload) => {
   const json = payload && typeof payload.json === 'string' ? payload.json : ''
-  if (!json.trim() || json.length > MAX_EXPORT_JSON) {
+  // 按 UTF-8 实际字节计量（与导入侧 statSync().size 同口径）——中文 3 字节/字，
+  // 字符数计量会放过实际超限的文件
+  if (!json.trim() || Buffer.byteLength(json, 'utf8') > MAX_EXPORT_JSON) {
     return { ok: false, error: '票据数据为空或超出大小限制' }
   }
   let target
@@ -418,6 +425,9 @@ const BADIO_SCRIPT = `(async function () {
     historyCount: getHistory().length
   };
   var oversize = await window.vbseIO.importInvoice();
+  // 导出超限：200K 个中文字符 = 600KB UTF-8 字节 > 512KB 上限，但字符数口径只有 200K——
+  // 字节口径必须拒绝（字符数口径会漏放，导入时再按字节拒绝就口径不一致）
+  var cjkExport = await window.vbseIO.exportInvoice('{"v":"' + '好'.repeat(200000) + '"}', 'cjk-oversize.json');
   var goodLine = { name: '合法明细', unit: '项', qty: 2, price: 3.5, taxRate: 0.13, amount: 7, taxAmount: 0.91 };
   function recordWith(overrides) {
     var rec = {
@@ -457,7 +467,7 @@ const BADIO_SCRIPT = `(async function () {
     formNumber: document.getElementById('invoiceNumber').value,
     historyCount: getHistory().length
   };
-  return { oversizeRejected: !!(oversize && oversize.ok === false), results: results, before: before, after: after };
+  return { oversizeRejected: !!(oversize && oversize.ok === false), exportOversizeRejected: !!(cjkExport && cjkExport.ok === false), results: results, before: before, after: after };
 })()`
 
 // 网页版零变化回归：无 preload 渲染（等价纯浏览器），固定 1440×940 视口。
@@ -483,6 +493,19 @@ const WEB_STATE_SCRIPT = `(function () {
     disclaimerOnPage: document.body.innerText.indexOf('教学样票，不作为真实开票或报销凭证') >= 0,
     teachingBadge: !!document.querySelector('.teaching-badge')
   };
+  // getHistory 防御：合法 JSON 但非法语义结构（"null"/"{}"/"123"/"true"/字符串）
+  // 必须回退空数组且 renderHistory 不崩溃（发布前收尾任务 3）
+  var historyGuard = {};
+  ['null', '{}', '123', 'true', '"str"'].forEach(function (bad) {
+    localStorage.setItem('vbseInvoiceHistory', bad);
+    var ok = true;
+    try {
+      if (!Array.isArray(getHistory())) ok = false;
+      renderHistory();
+    } catch (e) { ok = false; }
+    historyGuard[bad] = ok;
+  });
+  localStorage.removeItem('vbseInvoiceHistory');
   var companies = {
     buyerOptions: document.querySelectorAll('#buyerCompany option').length,
     optionsText: Array.prototype.map.call(document.querySelectorAll('#buyerCompany option'), function (o) { return o.textContent; }).join('|')
@@ -531,6 +554,7 @@ const WEB_STATE_SCRIPT = `(function () {
   renderInvoice(collectInvoiceData());
   return {
     identity: identity,
+    historyGuard: historyGuard,
     companies: companies,
     companyFill: companyFill,
     money: money,
@@ -682,6 +706,7 @@ async function runSmoke(phase, contents) {
     const rejected = state.results.filter((r) => !r.valid)
     const accepted = state.results.filter((r) => r.valid)
     result.ok = state.oversizeRejected === true &&
+      state.exportOversizeRejected === true &&
       rejected.every((r) => r.got !== "") &&
       accepted.every((r) => r.got === "") &&
       state.before.formNumber === state.after.formNumber &&
