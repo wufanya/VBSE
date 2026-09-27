@@ -69,7 +69,7 @@ release/                      # 打包输出（已 gitignore）
 ## 6. 测试与验证现状
 
 - `npm test`：小程序单测 7/7（node:test + strip-types）；
-- `npm run desktop:smoke`：两个用例依次 spawn Electron——常规 6 阶段（basic 桥/二维码/教学标注、write→read 跨进程持久化、flow 生成→号码自增→历史回填→打印→清空 + 金额口径断言、io 导出/导入往返、print 打印机 + PDF ≥5KB + 打印媒体截图）+ 边界韧性用例（损坏/超大 store 隔离、`.bak` 恢复、非法导入校验矩阵、失败不污染断言）；
+- `npm run desktop:smoke`：三个用例依次 spawn Electron——常规 6 阶段（basic 桥/二维码/教学标注、write→read 跨进程持久化、flow 生成→号码自增→历史回填→打印→清空 + 金额口径断言、io 导出/导入往返、print 打印机 + PDF ≥5KB + 打印媒体截图）+ 边界韧性用例（损坏/超大 store 隔离、`.bak` 恢复、非法导入校验矩阵、失败不污染断言）+ **网页版零变化回归**（无 preload 渲染共享 HTML、固定 1440×940 视口，布局/字体/入口显隐/存储路径/业务结果对 `WEB_BASELINE` 金标准逐项断言）；
 - `npm run verify` = build:mp + npm test + desktop:smoke；
 - 最近一次全绿：2026-09-27（单测 7/7、冒烟全绿）。
 

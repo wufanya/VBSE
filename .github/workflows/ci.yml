@@ -45,5 +45,5 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
-      - name: 桌面冒烟（常规 6 阶段 + 边界用例）
+      - name: 桌面冒烟（常规 6 阶段 + 边界/网页回归用例）
         run: npm run desktop:smoke

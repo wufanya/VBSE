@@ -206,7 +206,9 @@ function createWindow() {
     // 打包后由 exe 图标承担窗口/任务栏图标；这里主要服务开发模式
     icon: app.isPackaged ? undefined : path.join(__dirname, 'assets', 'icon.ico'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      // web 冒烟阶段刻意不带 preload：等价纯浏览器网页版（无 vbse-desktop 类、无桥、存储走
+      // localStorage），用于"网页版零变化"回归；发布路径永远带 preload，安全模型不变
+      preload: SMOKE_PHASE === 'web' ? undefined : path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -458,6 +460,62 @@ const BADIO_SCRIPT = `(async function () {
   return { oversizeRejected: !!(oversize && oversize.ok === false), results: results, before: before, after: after };
 })()`
 
+// 网页版零变化回归：无 preload 渲染（等价纯浏览器），固定视口采集特征快照。
+// 断言基线维护在 tests/run-desktop-smoke.ts 的 WEB_BASELINE——共享 HTML 的任何改动
+// 若改变网页版渲染/行为，这里的状态会偏离基线并在测试中报错。
+const WEB_SCRIPT = `(function () {
+  var cs = function (el, prop) { return el ? getComputedStyle(el)[prop] : ''; };
+  var formPanel = document.querySelector('.form-panel');
+  var previewPanel = document.querySelector('.preview-panel');
+  var layout = document.querySelector('.layout');
+  var invoice = document.getElementById('invoice');
+  var seal = document.querySelector('.seal');
+  var stage = document.getElementById('invoiceStage');
+  fillSample();
+  createInvoice();
+  var rows = [];
+  Array.prototype.forEach.call(document.querySelectorAll('#pGoodsBody tr'), function (tr) {
+    var tds = tr.querySelectorAll('td');
+    if (tds.length >= 7 && tds[4].textContent.trim() !== '') {
+      rows.push({ amount: tds[4].textContent, tax: tds[6].textContent });
+    }
+  });
+  return {
+    htmlClassName: document.documentElement.className,
+    hasBridge: !!window.vbseStorage,
+    hasIO: !!window.vbseIO,
+    bodyFont: cs(document.body, 'fontFamily'),
+    layoutColumns: cs(layout, 'gridTemplateColumns'),
+    invoicePosition: cs(invoice, 'position'),
+    previewPosition: cs(previewPanel, 'position'),
+    previewTop: cs(previewPanel, 'top'),
+    sealTop: cs(seal, 'top'),
+    sealLeft: cs(seal, 'left'),
+    ioBtnDisplay: cs(document.querySelector('.io-btn'), 'display'),
+    historyDeleteDisplay: cs(document.querySelector('.history-delete'), 'display'),
+    formPanelHeight: formPanel ? formPanel.offsetHeight : 0,
+    previewPanelHeight: previewPanel ? previewPanel.offsetHeight : 0,
+    stageMinHeight: stage ? stage.style.minHeight : '',
+    viewport: { w: window.innerWidth, h: window.innerHeight },
+    invoiceScrollOk: invoice ? invoice.scrollWidth <= invoice.clientWidth + 1 : false,
+    money: {
+      lineAmounts: rows.map(function (r) { return r.amount; }),
+      lineTaxes: rows.map(function (r) { return r.tax; }),
+      totalAmount: (document.getElementById('pTotalAmount') || {}).textContent || '',
+      totalTax: (document.getElementById('pTotalTax') || {}).textContent || '',
+      grandTotal: (document.getElementById('pGrandTotal') || {}).textContent || '',
+      upperAmount: (document.getElementById('pUpperAmount') || {}).textContent || ''
+    },
+    business: {
+      historyCountAfter: getHistory().length,
+      nextNumber: getNextInvoiceNumber(),
+      localStorageHistory: localStorage.getItem('vbseInvoiceHistory') !== null,
+      localStorageNext: localStorage.getItem('vbseInvoiceNextNumber') !== null,
+      historyCardCount: document.querySelectorAll('.history-card').length
+    }
+  };
+})()`
+
 async function runSmoke(phase, contents) {
   const result = { phase, ok: false }
 
@@ -518,6 +576,30 @@ async function runSmoke(phase, contents) {
       accepted.every((r) => r.got === "") &&
       state.before.formNumber === state.after.formNumber &&
       state.before.historyCount === state.after.historyCount
+  } else if (phase === 'web') {
+    // 固定 1440×940 视口（调试器仿真，与窗口/屏幕无关），消除环境差异后采集快照
+    process.stdout.write('WEB_STEP emulate\n')
+    contents.debugger.attach('1.3')
+    await contents.debugger.sendCommand('Page.enable')
+    await contents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+      width: 1440, height: 940, deviceScaleFactor: 1, mobile: false,
+    })
+    await sleep(300)
+    const state = await contents.executeJavaScript(WEB_SCRIPT, true)
+    try {
+      await contents.debugger.sendCommand('Emulation.clearDeviceMetricsOverride')
+    } catch (_) { /* 已 detach */ }
+    try { contents.debugger.detach() } catch (_) { /* 已分离 */ }
+    result.state = state
+    result.ok = state.hasBridge === false &&
+      state.hasIO === false &&
+      String(state.htmlClassName).indexOf('vbse-desktop') < 0 &&
+      state.viewport.w === 1440 &&
+      state.viewport.h === 940 &&
+      state.business.historyCountAfter === 1 &&
+      state.business.localStorageHistory === true &&
+      state.business.localStorageNext === true &&
+      state.invoiceScrollOk === true
   } else if (phase === 'print') {
     await runPrintSmoke(result, contents)
   } else if (phase === 'dialog') {

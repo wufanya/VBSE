@@ -215,3 +215,15 @@ dxcompiler/dxil（WebGPU 专用，27.2MB 解压，需 GPU 回退场景回归验�
 | 冒烟 | 矩阵扩至 17 用例：新增 totals 不一致、行金额不一致、行税额与税率不一致、**洗白陷阱**（price/amount/taxAmount/汇总全部传 `5e999` 字符串——若顺序错为先 normalize 后校验会全被洗成 0 而放行，现被整体拒绝） |
 | io 往返 | 导出→导入回放现在同时断言 `validateImportedInvoice(导出内容) === ""`（导出文件必须能通过自己的校验器） |
 | 回归 | `node --check` ✓；`npm test` 7/7；`npm run desktop:smoke` 2/2 全绿 |
+
+## 十二、网页版零变化回归护栏（2026-09-27 补充记录）
+
+| 项 | 结果 |
+| --- | --- |
+| 目的 | 未来抽取共享业务核心会直接修改约 1950 行共享 HTML；先建"网页版零变化"金标准，再动重构——任何改变网页版渲染/行为的改动都会被 `npm run desktop:smoke` 拦截 |
+| 实现 | `desktop/main.cjs` 新增 `web` 阶段：BrowserWindow **不带 preload**（等价纯浏览器：无 `vbse-desktop` 类、无 vbseStorage/vbseIO、存储走 localStorage），调试器固定 1440×940 视口（与屏幕/窗口无关）后采集特征快照；发布路径 preload 恒在，安全模型不变 |
+| 基线 | `tests/run-desktop-smoke.ts` 的 `WEB_BASELINE`（2026-09-27 实测）：字体栈 `"Microsoft YaHei", "PingFang SC", sans-serif`、栅格 `720px 666.667px`（表单左/预览右）、`.invoice` relative、`.preview-panel` static、监制章 `38px/563.333px`、`.io-btn`/`.history-delete` 均 `none`、表单面板 1339px/预览面板 1015px、缩放占位 552.852px |
+| 业务断言 | 示例票金额/税额/价税合计与大写与 `invoice.ts` 基准一致（大写含 ⓧ 前缀）；历史 +1、号码自增 `…701→…702`、**localStorage 被写入**（网页版存储路径，与桌面版"不写 localStorage"断言互为镜像）；发票无横向溢出 |
+| 回归 | `npm test` 7/7；`npm run desktop:smoke` **3/3** 全绿（web 用例 0.8s） |
+
+如实声明：基线在开发机 Electron 44 实测，字体栈断言依赖系统中文字体（GitHub runner 与教学机均含雅黑，若环境缺字体导致失败会在 font 断言处显式报错而非静默）；基线更新必须伴随 CHANGELOG 说明，属于"有意识地改变网页版"的显式动作。
